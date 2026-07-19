@@ -7,8 +7,8 @@ The bundled genus-`g` Siegel upper half-space `SiegelUpperHalfSpace g` and the c
 symmetric matrices and real quadratic forms on `EuclideanSpace ℝ (Fin g)` (`quadraticMapOfMatrix`,
 inverse to `gramMatrixReal`). Split out of `SiegelModular.lean` (which needs `Sp2gR`/
 `Matrix.symplecticGroup` for the group action) so that files needing only this matrix/quadratic-form
-layer — e.g. `PoissonSummation.lean`, which `SiegelModular.lean` will eventually depend on for the
-`S_g` transformation law — can import it without a circular dependency.
+layer — e.g. `PoissonSummation.lean`, which `SiegelModular.lean` depends on (alongside this file) for
+the `S_g` transformation law — can import it without a circular dependency.
 
 ## Main definitions
 
@@ -71,7 +71,7 @@ lemma SiegelUpperHalfSpace.toMatrix_map_im (τ : SiegelUpperHalfSpace g) :
   simp [SiegelUpperHalfSpace.toMatrix, Complex.add_im, Complex.mul_im, Complex.I_re, Complex.I_im]
 
 /-- The polar bilinear form of `Q`, expanded in the standard orthonormal basis via its Gram
-matrix: `Q.polarBilin a b = ∑ᵢⱼ aᵢ bⱼ (gramMatrixReal Q)ᵢⱼ`. Mirrors `EpsteinZeta.lean`'s
+matrix: `Q.polarBilin a b = ∑ᵢⱼ aᵢ bⱼ (gramMatrixReal Q)ᵢⱼ`. Mirrors `QuadraticFormUtils.lean`'s
 `polarBilin_eq_sum`, for `EuclideanSpace ℝ (Fin g)` directly rather than through a lattice
 embedding. -/
 lemma polarBilin_eq_gramMatrixReal_sum (Q : QuadraticMap ℝ (EuclideanSpace ℝ (Fin g)) ℝ)
@@ -92,7 +92,7 @@ lemma polarBilin_eq_gramMatrixReal_sum (Q : QuadraticMap ℝ (EuclideanSpace ℝ
   ring
 
 /-- `quadraticMapOfMatrix` inverts `gramMatrixReal`: rebuilding the quadratic form from its own
-Gram matrix recovers the original form. The general-matrix analogue of `EpsteinZeta.lean`'s
+Gram matrix recovers the original form. The general-matrix analogue of `QuadraticFormUtils.lean`'s
 `gramQuadraticMap_apply_toEuclidean`. Only `Invertible (2 : ℝ)` is used (via `invOf_mul_self`),
 not `ℝ`'s field structure. -/
 lemma quadraticMapOfMatrix_gramMatrixReal (Q : QuadraticMap ℝ (EuclideanSpace ℝ (Fin g)) ℝ) :

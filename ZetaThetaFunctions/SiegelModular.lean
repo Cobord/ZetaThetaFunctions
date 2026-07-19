@@ -34,12 +34,11 @@ the integral (Siegel modular) symplectic groups uniformly.
   `T`/`GL`/`S`-generator block matrices (`Sp2gR.Tmatrix`/`GLmatrix`/`Smatrix`) and identity case.
 * `BundledSiegelAction`: the induced `MulAction (Sp2gR (R := R) g) (SiegelUpperHalfSpace g)`
   instance on bundled Siegel points, and the cocycle identity behind `mul_smul`.
-* `IntegralSiegel`: the integral group `Sp2gZ`, integer-PosDef-to-real transfer
-  (`IntMatrixPosDefTransfer`), and the lattice/Euclidean quadratic-form correspondence
-  (`IntegralQuadraticFormExtension`) needed to act on `ThetaAbleQuadraticForm` data.
+* `IntegralSiegel`: the integral group `Sp2gZ`.
 * `ThetaTransform`: `RiemannThetaAble_siegelSMul` and the theta transformation law under each
-  generator (`ThetaTransformTMatrix`, `ThetaTransformGLMatrix` — both fully proved termwise;
-  `ThetaTransformSMatrix` — needs genuine Poisson resummation).
+  generator — `ThetaTransformTMatrix`/`ThetaTransformGLMatrix` (termwise identities,
+  `theta_fun_after_Tmatrix_diagEven`/`theta_fun_after_GLmatrix_reindex`) and `ThetaTransformSMatrix`
+  (genuine Poisson resummation via `PoissonSummation.lean`, `theta_fun_after_Smatrix`).
 
 -/
 

@@ -17,8 +17,7 @@ variable {n: ℕ}
 
 /-- The Gram matrix of a lattice quadratic form `Q : QuadraticMap ℤ (Fin n → ℤ) S`, at the
 standard basis of `Fin n → ℤ`: `Mᵢⱼ = polar Q eᵢ eⱼ`. Generic in the codomain `S` — shared by
-`EpsteinZeta.lean`'s `gramMatrix` (`S := ℤ`) and `SiegelModular.lean`'s `gramMatrixLattice`
-(`S := ℝ`). -/
+`gramMatrix` (`S := ℤ`) and `gramMatrixLattice` (`S := ℝ`), both below. -/
 noncomputable def latticeGramMatrix {S : Type*} [CommRing S] (Q : QuadraticMap ℤ (Fin n → ℤ) S) :
     Matrix (Fin n) (Fin n) S :=
   fun i j => Q.polarBilin (Pi.single i 1) (Pi.single j 1)
@@ -454,7 +453,7 @@ section QuadFromMatrix
 
 /-- The real quadratic form on `EuclideanSpace ℝ (Fin g)` with Gram matrix `S` in the standard
 orthonormal basis, `Q x = ⅟2 ∑ᵢⱼ Sᵢⱼ xᵢxⱼ` — inverse to `gramMatrixReal` on symmetric `S`
-(the general-matrix analogue of `EpsteinZeta.lean`'s `gramQuadraticMap`, which is specialized to
+(the general-matrix analogue of `gramQuadraticMap` above, which is specialized to
 integral matrices). Phrased via `⅟(2 : ℝ)` (`Invertible`), not `(2 : ℝ)⁻¹`: the polarization
 argument behind the round-trip lemmas below only ever needs `2` invertible, not that `ℝ` is a
 field — `ℝ`'s field structure is a red herring here, `Invertible (2 : ℝ)` is the actual
@@ -466,8 +465,8 @@ noncomputable def quadraticMapOfMatrix (S : Matrix (Fin g) (Fin g) R) :
 
 omit [Algebra R ℂ] [IsScalarTower R ℝ ℂ] in
 /-- `quadraticMapOfMatrix` unfolded at a point, for an arbitrary coefficient matrix `S` over the
-ambient ring `R` (not just `ℝ`) — the general-matrix analogue of `EpsteinZeta.lean`'s
-`gramQuadraticMap_apply_toEuclidean`. -/
+ambient ring `R` (not just `ℝ`) — the general-matrix analogue of `gramQuadraticMap_apply_toEuclidean`
+above. -/
 lemma quadraticMapOfMatrix_apply (S : Matrix (Fin g) (Fin g) R) (x : EuclideanSpace ℝ (Fin g)) :
     quadraticMapOfMatrix S x = ⅟(2 : ℝ) * ∑ i, ∑ j, (algebraMap R ℝ (S i j)) * (x i * x j) := by
   simp [quadraticMapOfMatrix, QuadraticMap.smul_apply, QuadraticMap.sum_apply,
@@ -492,7 +491,7 @@ lemma quadraticMapOfMatrix_smul (c : ℝ) (S : Matrix (Fin g) (Fin g) ℝ) :
 
 omit [Algebra R ℂ] [IsScalarTower R ℝ ℂ] in
 /-- `quadraticMapOfMatrix S` is continuous: it is a finite sum of scalar multiples of products of
-coordinate projections. Mirrors `EpsteinZeta.lean`'s `gramQuadraticMap_continuous`. -/
+coordinate projections. Mirrors `gramQuadraticMap_continuous` above. -/
 lemma quadraticMapOfMatrix_continuous (S : Matrix (Fin g) (Fin g) R) :
     Continuous (quadraticMapOfMatrix S) := by
   have heq : (quadraticMapOfMatrix S : EuclideanSpace ℝ (Fin g) → ℝ) =
@@ -574,7 +573,7 @@ section IntMatrixPosDefTransfer
 /-- A positive-definite *integer* matrix stays positive-definite after casting into `ℝ`. This is
 genuinely not formal: `Matrix.PosDef` over `ℤ` only quantifies over `x : Fin g → ℤ`, while over `ℝ`
 it quantifies over the whole continuum `Fin g → ℝ`. The argument: (1) clear denominators
-(`rat_common_denominator`, from `EpsteinZeta.lean`) to get positivity on `Fin g → ℚ`, then extend to
+(`rat_common_denominator` above) to get positivity on `Fin g → ℚ`, then extend to
 all of `Fin g → ℝ` by continuity and density of `ℚ^g` in `ℝ^g`, giving `PosSemidef` over `ℝ`; (2)
 `S.det ≠ 0` over `ℤ` (else `Matrix.exists_mulVec_eq_zero_iff`, valid since `ℤ` is a domain, gives an
 integer kernel vector `z ≠ 0` with `z ⬝ᵥ S.mulVec z = 0`, contradicting strict positivity at `z`),
@@ -685,7 +684,7 @@ section IntegralQuadraticFormExtension
 quadratic form on `EuclideanSpace ℝ (Fin g)` via its Gram matrix (`gramMatrixLattice`) and
 `quadraticMapOfMatrix`. Continuity is automatic (`quadraticMapOfMatrix_continuous`); *positive*-
 definiteness is **not** automatic from `Q`'s positivity on the lattice alone (unlike the integral,
-`ℤ`-valued case handled by `EpsteinZeta.posDefR`) — an `ℝ`-valued lattice quadratic form positive at
+`ℤ`-valued case handled by `posDefR` above) — an `ℝ`-valued lattice quadratic form positive at
 every nonzero lattice point can still fail to be positive-definite on the real span (e.g. a rank-one
 form vanishing along an irrational direction, which therefore never meets the lattice) — so callers
 must supply that fact separately. -/

@@ -8,10 +8,10 @@ import Mathlib.Tactic.LinearCombination
 # The symplectic group `Sp(2g, R)`
 
 This file is purely about the abstract group `Sp2gR (R := R) g := Matrix.symplecticGroup (Fin g) R`
-— block decomposition, multiplication formulas, symplectic relations, and the two classical
-families of generators (`Tmatrix`/upper-unipotent translations and `GLmatrix`/the `GL(g, ℤ)`
-action) — with no dependence on the Siegel upper half-space or theta functions. Those live in
-`SiegelModular.lean`, which imports this file.
+— block decomposition, multiplication formulas, symplectic relations, and the three classical
+families of generators (`Tmatrix`/upper-unipotent translations, `GLmatrix`/the `GL(g, ℤ)` action,
+and `Smatrix`/the Fourier long-Weyl element) — with no dependence on the Siegel upper half-space or
+theta functions. Those live in `SiegelModular.lean`, which imports this file.
 
 ## Main definitions
 
@@ -19,8 +19,16 @@ action) — with no dependence on the Siegel upper half-space or theta functions
 * `Sp2gR.blockA/B/C/D`: the block decomposition `!![A, B; C, D]` of a symplectic matrix.
 * `Sp2gR.Tmatrix B hB`: the upper-unipotent generator `!![1, B; 0, 1]` for symmetric `B`.
 * `Sp2gR.GLmatrix U hU`: the block-diagonal `GL(g, ℤ)`-action generator `!![U, 0; 0, (Uᵀ)⁻¹]`.
+* `Sp2gR.Smatrix`: the Fourier long-Weyl generator `!![0, -1; 1, 0]`.
 * `Sp2gR.block_relations`/`_complex`: the symplectic relations `AᵀC=CᵀA`, `BᵀD=DᵀB`,
   `AᵀD-CᵀB=1`, `DᵀA-BᵀC=1` for the blocks of a symplectic matrix.
+
+## Sections
+
+* `SL2Embedding`: fixed-block embeddings `SL(2, R) ↪ Sp(2g, R)` (`Sp2gR.SL2blockMatrix`) built from
+  four fixed `g × g` matrices `A, B, C, D`, plus the standard `SL(2, R)` generators
+  (`SL2upper`/`SL2lower`/`SL2rotation`) used to recover `Tmatrix`/`Smatrix`-style relations from the
+  `g = 1` case.
 
 -/
 
@@ -152,10 +160,10 @@ end Product
 
 /-- `B ↦ Sp2gR.Tmatrix B` is a monoid homomorphism from `(Matrix (Fin g) (Fin g) R, IsSymm, +)`
 into `Sp2gR (R := R) g`: `Tmatrix B₁ * Tmatrix B₂ = Tmatrix (B₁ + B₂)`, matching the matrix identity
-`!![1,B₁;0,1] * !![1,B₂;0,1] = !![1,B₁+B₂;0,1]`. This is what makes the even-symmetric-integer-matrix
-T-shifts a genuine *subgroup* of `Sp(2g, ℤ)`, consistent with `diagShift`'s own additivity
-(`diagShift_add`, in `SiegelModular.lean`): composing two T-shifts composes their theta-series
-shifts additively too. -/
+`!![1,B₁;0,1] * !![1,B₂;0,1] = !![1,B₁+B₂;0,1]`. This is what makes the even-diagonal-symmetric-
+integer-matrix T-shifts a genuine *subgroup* of `Sp(2g, ℤ)`, consistent with
+`SiegelModular.lean`'s `theta_fun_after_Tmatrix_diagEven`: composing two T-shifts composes their
+theta-series multipliers accordingly. -/
 lemma Sp2gR.Tmatrix_mul (B₁ B₂ : Matrix (Fin g) (Fin g) R) (hB₁ : B₁.IsSymm) (hB₂ : B₂.IsSymm) :
     Sp2gR.Tmatrix B₁ hB₁ * Sp2gR.Tmatrix B₂ hB₂
       = Sp2gR.Tmatrix (B₁ + B₂)

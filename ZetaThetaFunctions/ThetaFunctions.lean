@@ -37,7 +37,7 @@ The quasi-periodicity of `theta_fun` under shifting `z` by one full period of th
 ### `GaussianTheta`
 Real-variable estimates for Gaussian bump functions on `EuclideanSpace ℝ (Fin n)`: transferring
 positive-definiteness to a lower bound on the exponent (`bound_gaussian_exponent`, via
-`EpsteinZeta.lean`'s `posDef_lower_bound`), and showing a Gaussian eventually beats any negative power of
+`QuadraticFormUtils.lean`'s `posDef_lower_bound`), and showing a Gaussian eventually beats any negative power of
 the (recentred) radius (`gaussianVPolyDecay`), the estimate driving summability of lattice Gaussian
 sums.
 
@@ -1279,8 +1279,8 @@ definite), is restricted here to the *one-complex-parameter scalar slice* `Q = �
 `qRe = τ.re • q`, `qIm = τ.im • q`. So write `θ(z; τq)` for `theta_fun z` at this particular
 instance, to keep `q` visible — it is *not* the general Siegel-point theta `θ(z; Q)`. This
 generalizes `jacobiThetaAble` (the `n = 1` case, `q = sq`) to any such `q`, and connects this
-theta machinery back to the Epstein zeta function work in `EpsteinZeta.lean` (`gramQuadraticMap`,
-`posDefR`). Keeping the full `τ`-dependence here (rather than fixing `τ.re = 0`, the very
+theta machinery back to the Epstein zeta function work in `EpsteinZeta.lean`, via
+`QuadraticFormUtils.lean`'s `gramQuadraticMap`/`posDefR`. Keeping the full `τ`-dependence here (rather than fixing `τ.re = 0`, the very
 degenerate "Gaussian sum" case flagged in `ThetaAbleQuadraticForm`'s docstring) is what makes it
 possible to even *pose* questions of modularity: `θ(0; τq) = theta_const` at this instance (`z`
 fixed at `0`) is a function of `τ` alone, and modularity asks how it transforms under the action
