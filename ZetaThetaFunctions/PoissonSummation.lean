@@ -1,350 +1,98 @@
 import Mathlib.Analysis.SpecialFunctions.Gaussian.PoissonSummation
 import Mathlib.LinearAlgebra.Matrix.PosDef
-import Mathlib.LinearAlgebra.Matrix.SchurComplement
+import ZetaThetaFunctions.GaussianFourierTransform
+import ZetaThetaFunctions.SchurPivot
 import ZetaThetaFunctions.SiegelUpperHalfSpace
 
 /-!
 # Rank-`g` Poisson summation for a Gaussian
 
 The matrix generalization of `Complex.tsum_exp_neg_quadratic`
-(`Mathlib.Analysis.SpecialFunctions.Gaussian.PoissonSummation`), needed as the missing analytic
-ingredient behind the `S_g` Siegel modular transformation law
-(`ZetaFunctions/SiegelModular.lean`, `section ThetaTransformSMatrix`) and the Epstein zeta
-functional equation; see `ZetaFunctions/PoissonSummationPlan.md` for the gap analysis and the
-reduction of both targets to this statement.
+(`Mathlib.Analysis.SpecialFunctions.Gaussian.PoissonSummation`), needed as the analytic ingredient
+behind the `S_g` Siegel modular transformation law (`SiegelModular.lean`,
+`section ThetaTransformSMatrix`) and the Epstein zeta functional equation.
 
-## The branch of `(det A)^(1/2)`
+This is the bridge file: it proves the discrete lattice-sum identity
+`tsum_exp_neg_quadratic_matrix` (by induction on `g` via one-coordinate Schur complementation,
+`schurStepLast`/`pivotSqrt` from `SchurPivot.lean`, with zero gaps), defines the abstract
+`HasPoissonSummation` predicate on `EuclideanSpace ℝ (Fin g) → ℂ`, and combines the discrete
+identity with `GaussianFourierTransform.lean`'s continuous Gaussian analysis (which knows nothing
+about lattices) into `modulatedGaussian_hasPoissonSummation`.
 
-The naive `A.det ^ (1/2 : ℂ)` (`Complex.cpow`, principal branch, cut along the negative reals) is
-*not* a valid choice of square root for `g ≥ 3`: writing `A = R(I + iS)R` with `R` the PosDef square
-root of `Re A` and `S` real symmetric (via congruence), `arg (A.det) = ∑ arg (1 + i λₖ)` over the
-eigenvalues `λₖ` of `S`, each term strictly inside `(-π/2, π/2)`. For `g ≤ 2` the sum is forced
-strictly inside `(-π, π)`, so `A.det` never touches the branch cut and `cpow` is safe (this is
-exactly why Mathlib's scalar `Complex.tsum_exp_neg_quadratic`, i.e. `g = 1`, needs no such care).
-For `g ≥ 3` the sum can exceed `π` in absolute value (e.g. `A = (1 + it) • (1 : Matrix (Fin 3) ..)`
-crosses the cut at `t = √3`, where `A.det = (1 + i√3)^3 = -8`), so `cpow` jumps by a sign relative
-to the true continuously-varying square root, while the sum-side of the identity (manifestly
-continuous in `A`) cannot jump — so the naive statement is genuinely false there, not merely hard.
-
-`pivotSqrt` below fixes this: it is the product of the principal-branch square roots of the pivots
-produced by repeated one-coordinate Schur complementation (`schurStepLast`), i.e. a "plain-transpose
-LDL-decomposition" (not Mathlib's `Mathlib.Analysis.Matrix.LDL`, which is for `IsHermitian`/`PosDef`
-matrices under `Mᴴ`, whereas `A` here is only `IsSymm`/`Mᵀ`). Each pivot individually has positive
-real part (inherited from `Re A ≻ 0` via `schurStepLast_re_posDef`), so each individual `cpow` is
-branch-safe by the `g = 1` argument above, and `pivotSqrt_sq` shows the product squares to `A.det` —
-matching the naive `cpow` whenever that one happens to be safe (`g ≤ 2`), but remaining correct and
-well-defined for all `g`.
 -/
 
+section AbstractHasPoissonSummation
+
+open scoped Complex
+open scoped Real FourierTransform RealInnerProductSpace
+
+/-! ## An abstract Poisson-summation predicate on `EuclideanSpace ℝ (Fin g) → ℂ` -/
+
+/-- `f` has a Fourier transform (`f` is integrable, so Mathlib's `𝓕 f` — the Fourier transform on
+the real inner product space `EuclideanSpace ℝ (Fin g)`, `Mathlib.Analysis.Fourier.FourierTransform`
+— is genuinely the Fourier transform of `f` rather than a junk `0`) and Poisson summation holds for
+`f` against it: the lattice sums of `f` and of `𝓕 f` over `ℤ^g` both converge, and to the same
+value. -/
+def HasPoissonSummation (f : EuclideanSpace ℝ (Fin g) → ℂ) : Prop :=
+  MeasureTheory.Integrable f ∧
+    Summable (fun n : Fin g → ℤ => f (toEuclidean_ZnRn n)) ∧
+    Summable (fun n : Fin g → ℤ => 𝓕 f (toEuclidean_ZnRn n)) ∧
+    ∑' n : Fin g → ℤ, f (toEuclidean_ZnRn n) = ∑' n : Fin g → ℤ, 𝓕 f (toEuclidean_ZnRn n)
+
+private lemma summable_finsetSum {ι α : Type*} [AddCommGroup α] [UniformSpace α]
+    [IsUniformAddGroup α] (s : Finset ι) (h : ι → (Fin g → ℤ) → α)
+    (hh : ∀ i ∈ s, Summable (h i)) : Summable (fun n => ∑ i ∈ s, h i n) := by
+  classical
+  induction s using Finset.induction_on with
+  | empty => simp
+  | insert a s ha ih =>
+    simp only [Finset.sum_insert ha]
+    exact (hh a (Finset.mem_insert_self a s)).add
+      (ih fun i hi => hh i (Finset.mem_insert_of_mem hi))
+
+/-- `HasPoissonSummation` is closed under finite `ℂ`-linear combinations. -/
+lemma HasPoissonSummation.finsetSum {ι : Type*} (s : Finset ι) (c : ι → ℂ)
+    (f : ι → EuclideanSpace ℝ (Fin g) → ℂ) (hf : ∀ i ∈ s, HasPoissonSummation (f i)) :
+    HasPoissonSummation (fun x => ∑ i ∈ s, c i • f i x) := by
+  have hIntegrable : ∀ i ∈ s, MeasureTheory.Integrable (fun x => c i • f i x) :=
+    fun i hi => ((hf i hi).1).smul (c i)
+  have hFourier : ∀ w, 𝓕 (fun x => ∑ i ∈ s, c i • f i x) w = ∑ i ∈ s, c i • 𝓕 (f i) w := by
+    intro w
+    simp only [Real.fourier_eq]
+    rw [show (fun v => 𝐞 (-⟪v, w⟫) • ∑ i ∈ s, c i • f i v) =
+        fun v => ∑ i ∈ s, c i • (𝐞 (-⟪v, w⟫) • f i v) from
+      funext fun v => by
+        rw [Finset.smul_sum]
+        exact Finset.sum_congr rfl fun i _ => by simp [Circle.smul_def, mul_left_comm]]
+    have hsplit :
+        (∫ v, ∑ i ∈ s, c i • (𝐞 (-⟪v, w⟫) • f i v)) =
+          ∑ i ∈ s, ∫ v, c i • (𝐞 (-⟪v, w⟫) • f i v) :=
+      MeasureTheory.integral_finsetSum s fun i hi =>
+        ((Real.fourierIntegral_convergent_iff w).mpr (hf i hi).1).smul (c i)
+    rw [hsplit]
+    exact Finset.sum_congr rfl fun i _ => by rw [MeasureTheory.integral_smul]
+  refine ⟨MeasureTheory.integrable_finsetSum s hIntegrable,
+    summable_finsetSum s (fun i n => c i • f i (toEuclidean_ZnRn n))
+      (fun i hi => ((hf i hi).2.1).const_smul (c i)),
+    ?_, ?_⟩
+  · refine (summable_finsetSum s (fun i n => c i • 𝓕 (f i) (toEuclidean_ZnRn n))
+      (fun i hi => ((hf i hi).2.2.1).const_smul (c i))).congr fun n => ?_
+    rw [hFourier]
+  · simp_rw [hFourier]
+    rw [tsum_congr fun n => rfl,
+      Summable.tsum_finsetSum fun i hi => ((hf i hi).2.1).const_smul (c i),
+      Summable.tsum_finsetSum fun i hi => ((hf i hi).2.2.1).const_smul (c i)]
+    refine Finset.sum_congr rfl fun i hi => ?_
+    rw [tsum_const_smul'' (c i), tsum_const_smul'' (c i), (hf i hi).2.2.2]
+
+end AbstractHasPoissonSummation
+
+section Helpers
+
 open Complex
-open scoped Real
+open scoped Real FourierTransform RealInnerProductSpace
 
 variable {g : ℕ}
-
-/-- One step of symmetric (plain-transpose, not conjugate-transpose) Gaussian elimination: the
-Schur complement of `A` with respect to its bottom-right corner `A (last) (last)`. -/
-noncomputable def schurStepLast {g : ℕ} (A : Matrix (Fin (g + 1)) (Fin (g + 1)) ℂ) :
-    Matrix (Fin g) (Fin g) ℂ :=
-  fun i j => A i.castSucc j.castSucc -
-    A i.castSucc (Fin.last g) * A (Fin.last g) j.castSucc / A (Fin.last g) (Fin.last g)
-
-/-- The correctly-branched square root of `A.det`, for `A` symmetric with `Re A ≻ 0`: the product
-of the principal-branch square roots of the pivots of repeated `schurStepLast`. See the module
-docstring for why this differs from (and is well-defined where) `A.det ^ (1/2 : ℂ)` is not. -/
-noncomputable def pivotSqrt : (g : ℕ) → Matrix (Fin g) (Fin g) ℂ → ℂ
-  | 0, _ => 1
-  | g + 1, A => A (Fin.last g) (Fin.last g) ^ (1 / 2 : ℂ) * pivotSqrt g (schurStepLast A)
-
-lemma schurStepLast_isSymm {g : ℕ} {A : Matrix (Fin (g + 1)) (Fin (g + 1)) ℂ} (hA : A.IsSymm) :
-    (schurStepLast A).IsSymm := by
-  ext i j
-  simp only [Matrix.transpose_apply, schurStepLast]
-  rw [hA.apply i.castSucc j.castSucc, hA.apply (Fin.last g) j.castSucc,
-    hA.apply i.castSucc (Fin.last g)]
-  ring
-
-/-- For `c a : ℂ` with `0 < a.re`, `(c^2/a).re ≤ c.re^2 / a.re`. The numeric core of
-`schurStepLast_re_posDef`: completing the square in the *real* direction only recovers `c.re^2/a.re`
-(from `Re A ≻ 0` applied to a real vector), which this shows dominates the true complex quantity
-`Re(c^2/a)`; the gap is exactly the perfect square `(c.re * a.im - c.im * a.re)^2 ≥ 0`. -/
-private lemma re_sq_div_le (c a : ℂ) (ha : 0 < a.re) : (c ^ 2 / a).re ≤ c.re ^ 2 / a.re := by
-  have hane : a ≠ 0 := fun h => by simp [h] at ha
-  have hnsq : (0 : ℝ) < Complex.normSq a := Complex.normSq_pos.mpr hane
-  have hns : Complex.normSq a = a.re * a.re + a.im * a.im := Complex.normSq_apply a
-  rw [sq, Complex.div_re, Complex.mul_re, Complex.mul_im, ← add_div, div_le_div_iff₀ hnsq ha]
-  nlinarith [sq_nonneg (c.re * a.im - c.im * a.re), hns]
-
-/-- The hard analytic ingredient: one-coordinate Schur complementation of a symmetric complex
-matrix preserves positive-definiteness of the real part. Elementary direct proof: extend a real
-test vector `x` for the Schur complement to `y = Fin.snoc x t` with `t := -(∑ v i * x i).re / a.re`
-(`v` the eliminated column, `a` the pivot); `Re A ≻ 0` applied to `y` gives a real quadratic
-inequality that, combined with `re_sq_div_le`, dominates the genuinely complex quantity appearing
-in the Schur complement's quadratic form. -/
-lemma schurStepLast_re_posDef {g : ℕ} {A : Matrix (Fin (g + 1)) (Fin (g + 1)) ℂ} (hA : A.IsSymm)
-    (hRe : (A.map Complex.re).PosDef) :
-    ((schurStepLast A).map Complex.re).PosDef := by
-  refine Matrix.PosDef.of_dotProduct_mulVec_pos ?_ ?_
-  · rw [Matrix.isHermitian_iff_isSymm]
-    exact (schurStepLast_isSymm hA).map _
-  · intro x hx
-    set a : ℂ := A (Fin.last g) (Fin.last g) with ha_def
-    have hα : 0 < a.re := by
-      have hdiag := hRe.diag_pos (i := Fin.last g)
-      simpa [Matrix.map_apply, ha_def] using hdiag
-    set v : Fin g → ℂ := fun i => A i.castSucc (Fin.last g) with hv_def
-    set c : ℂ := ∑ i, v i * (x i : ℂ) with hc_def
-    set t : ℝ := -c.re / a.re with ht_def
-    set y : Fin (g + 1) → ℝ := Fin.snoc x t with hy_def
-    have hyne : y ≠ 0 := by
-      intro h
-      apply hx
-      funext i
-      have hxi := congrFun h i.castSucc
-      simpa [hy_def, Fin.snoc_castSucc] using hxi
-    have hpos := hRe.dotProduct_mulVec_pos hyne
-    simp only [star_trivial, dotProduct, Matrix.mulVec, Matrix.map_apply,
-      Fin.sum_univ_castSucc, Fin.snoc_castSucc, Fin.snoc_last, hy_def] at hpos
-    have hcre' : c.re = ∑ i, (A i.castSucc (Fin.last g)).re * x i := by
-      rw [hc_def, Complex.re_sum]
-      exact Finset.sum_congr rfl fun i _ => by rw [hv_def]; simp [Complex.mul_re]
-    have hsymm : ∀ j : Fin g, (A (Fin.last g) j.castSucc).re = (A j.castSucc (Fin.last g)).re :=
-      fun j => by rw [hA.apply j.castSucc (Fin.last g)]
-    have e1 : ∑ i : Fin g, x i * (∑ j : Fin g, (A i.castSucc j.castSucc).re * x j +
-          (A i.castSucc (Fin.last g)).re * t) =
-        (∑ i, ∑ j, x i * x j * (A i.castSucc j.castSucc).re) + t * c.re := by
-      rw [hcre', Finset.mul_sum]
-      simp only [mul_add, Finset.sum_add_distrib, Finset.mul_sum]
-      congr 1
-      · exact Finset.sum_congr rfl fun i _ => Finset.sum_congr rfl fun j _ => by ring
-      · exact Finset.sum_congr rfl fun i _ => by ring
-    have e2 : t * (∑ j : Fin g, (A (Fin.last g) j.castSucc).re * x j +
-          (A (Fin.last g) (Fin.last g)).re * t) =
-        t * c.re + t ^ 2 * a.re := by
-      have hcre'' : ∑ j : Fin g, (A (Fin.last g) j.castSucc).re * x j = c.re := by
-        rw [hcre']
-        exact Finset.sum_congr rfl fun j _ => by rw [hsymm j]
-      rw [mul_add, hcre'', ← ha_def]
-      ring
-    have hexpand_y : ∑ i : Fin g, x i * (∑ j : Fin g, (A i.castSucc j.castSucc).re * x j +
-          (A i.castSucc (Fin.last g)).re * t) +
-        t * (∑ j : Fin g, (A (Fin.last g) j.castSucc).re * x j + (A (Fin.last g)
-          (Fin.last g)).re * t) =
-        (∑ i, ∑ j, x i * x j * (A i.castSucc j.castSucc).re) + 2 * t * c.re + t ^ 2 * a.re := by
-      rw [e1, e2]; ring
-    rw [hexpand_y] at hpos
-    have ht2 : 2 * t * c.re + t ^ 2 * a.re = -(c.re ^ 2 / a.re) := by
-      rw [ht_def]; field_simp; ring
-    rw [show ∑ i, ∑ j, x i * x j * (A i.castSucc j.castSucc).re + 2 * t * c.re + t ^ 2 * a.re
-        = ∑ i, ∑ j, x i * x j * (A i.castSucc j.castSucc).re + (2 * t * c.re + t ^ 2 * a.re) from
-        by ring, ht2] at hpos
-    have hquad : (c ^ 2 / a).re = ∑ i, ∑ j, x i * x j * (v i * v j / a).re := by
-      have hc2 : c ^ 2 = ∑ i, ∑ j, (x i : ℂ) * (x j : ℂ) * (v i * v j) := by
-        rw [hc_def, sq, Finset.sum_mul_sum]
-        exact Finset.sum_congr rfl fun i _ => Finset.sum_congr rfl fun j _ => by ring
-      rw [hc2, Finset.sum_div, Complex.re_sum]
-      refine Finset.sum_congr rfl fun i _ => ?_
-      rw [Finset.sum_div, Complex.re_sum]
-      refine Finset.sum_congr rfl fun j _ => ?_
-      rw [show (x i : ℂ) * (x j : ℂ) * (v i * v j) / a
-          = ((x i * x j : ℝ) : ℂ) * (v i * v j / a) from by push_cast; ring]
-      simp [Complex.mul_re]
-    have hentry : ∀ i j : Fin g, x i * x j * (schurStepLast A i j).re =
-        x i * x j * (A i.castSucc j.castSucc).re - x i * x j * (v i * v j / a).re := by
-      intro i j
-      have hij : schurStepLast A i j = A i.castSucc j.castSucc - v i * v j / a := by
-        show A i.castSucc j.castSucc - A i.castSucc (Fin.last g) * A (Fin.last g) j.castSucc / a
-            = A i.castSucc j.castSucc - v i * v j / a
-        rw [hv_def, hA.apply j.castSucc (Fin.last g)]
-      rw [hij, Complex.sub_re, mul_sub]
-    have hunfold : x ⬝ᵥ ((schurStepLast A).map Complex.re).mulVec x =
-        ∑ i, ∑ j, x i * x j * (schurStepLast A i j).re := by
-      simp only [dotProduct, Matrix.mulVec, Matrix.map_apply, Finset.mul_sum]
-      exact Finset.sum_congr rfl fun i _ => Finset.sum_congr rfl fun j _ => by ring
-    have hgoal : x ⬝ᵥ ((schurStepLast A).map Complex.re).mulVec x =
-        (∑ i, ∑ j, x i * x j * (A i.castSucc j.castSucc).re) - (c ^ 2 / a).re := by
-      rw [hunfold]
-      simp only [hentry, Finset.sum_sub_distrib]
-      rw [← hquad]
-    rw [star_trivial, hgoal]
-    have hle := re_sq_div_le c a hα
-    linarith
-
-/-- Determinant Schur identity for one-coordinate elimination: `A.det` factors as the pivot times
-the determinant of the Schur complement. Needs `A (last) (last) ≠ 0`, which in our application
-follows from `schurStepLast_re_posDef`'s hypothesis via `Matrix.PosDef.diag_pos`. -/
-lemma det_eq_pivot_mul_det_schurStepLast {g : ℕ} {A : Matrix (Fin (g + 1)) (Fin (g + 1)) ℂ}
-    (ha : A (Fin.last g) (Fin.last g) ≠ 0) :
-    A.det = A (Fin.last g) (Fin.last g) * (schurStepLast A).det := by
-  classical
-  set A₁₁ : Matrix (Fin g) (Fin g) ℂ := fun i j => A i.castSucc j.castSucc with hA₁₁
-  set A₁₂ : Matrix (Fin g) (Fin 1) ℂ := fun i _ => A i.castSucc (Fin.last g) with hA₁₂
-  set A₂₁ : Matrix (Fin 1) (Fin g) ℂ := fun _ j => A (Fin.last g) j.castSucc with hA₂₁
-  set A₂₂ : Matrix (Fin 1) (Fin 1) ℂ := fun _ _ => A (Fin.last g) (Fin.last g) with hA₂₂
-  have hcast : ∀ i : Fin g, finSumFinEquiv (Sum.inl i : Fin g ⊕ Fin 1) = i.castSucc := by
-    intro i
-    rw [finSumFinEquiv_apply_left]
-    rfl
-  have hlast : finSumFinEquiv (Sum.inr (0 : Fin 1)) = Fin.last g := by
-    have h := congrArg finSumFinEquiv (finSumFinEquiv_symm_last (n := g))
-    rwa [Equiv.apply_symm_apply] at h
-  have hblock : A.submatrix finSumFinEquiv finSumFinEquiv =
-      Matrix.fromBlocks A₁₁ A₁₂ A₂₁ A₂₂ := by
-    ext (i | i) (j | j) <;>
-      simp only [Matrix.submatrix_apply, Matrix.fromBlocks_apply₁₁, Matrix.fromBlocks_apply₁₂,
-        Matrix.fromBlocks_apply₂₁, Matrix.fromBlocks_apply₂₂, hA₁₁, hA₁₂, hA₂₁, hA₂₂,
-        hcast, Fin.eq_zero, hlast]
-  have hdetA : A.det = (Matrix.fromBlocks A₁₁ A₁₂ A₂₁ A₂₂).det := by
-    rw [← hblock, Matrix.det_submatrix_equiv_self]
-  have hA22det : A₂₂.det = A (Fin.last g) (Fin.last g) := by
-    rw [hA₂₂, Matrix.det_fin_one]
-  have hA22unit : IsUnit A₂₂ := by
-    rw [Matrix.isUnit_iff_isUnit_det, hA22det]
-    exact ha.isUnit
-  haveI : Invertible A₂₂ := hA22unit.invertible
-  have hA22inv : A₂₂⁻¹ = fun _ _ => (A (Fin.last g) (Fin.last g))⁻¹ := by
-    apply Matrix.inv_eq_right_inv
-    ext i j
-    have : (i : Fin 1) = 0 := Fin.eq_zero i
-    have hj : (j : Fin 1) = 0 := Fin.eq_zero j
-    simp [Matrix.mul_apply, Matrix.one_apply, this, hj, hA₂₂,
-      mul_inv_cancel₀ ha]
-  have hschur : A₁₁ - A₁₂ * A₂₂⁻¹ * A₂₁ = schurStepLast A := by
-    rw [hA22inv]
-    ext i j
-    simp only [hA₁₁, hA₁₂, hA₂₁, Matrix.sub_apply, Matrix.mul_apply, Fin.sum_univ_one,
-      schurStepLast, div_eq_mul_inv]
-    ring
-  rw [hdetA, Matrix.det_fromBlocks₂₂, Matrix.invOf_eq_nonsing_inv, hA22det, hschur]
-
-/-- Block-inverse Schur identity: `A⁻¹`'s entries in terms of `(schurStepLast A)⁻¹` and the pivot.
-The genuinely new ingredient (beyond `det_eq_pivot_mul_det_schurStepLast`) needed for the `S_g`
-Poisson summation induction: after one 1-D Poisson summation step, the dual quadratic form must be
-matched against `A⁻¹` itself, not just `A.det`. -/
-lemma matrix_inv_blocks {g : ℕ} {A : Matrix (Fin (g + 1)) (Fin (g + 1)) ℂ}
-    (ha : A (Fin.last g) (Fin.last g) ≠ 0) (hA'' : (schurStepLast A).det ≠ 0) :
-    (∀ i j : Fin g, A⁻¹ i.castSucc j.castSucc = (schurStepLast A)⁻¹ i j) ∧
-      (∀ i : Fin g, A⁻¹ i.castSucc (Fin.last g) =
-        -(∑ l, (schurStepLast A)⁻¹ i l * A l.castSucc (Fin.last g)) /
-          A (Fin.last g) (Fin.last g)) ∧
-      (∀ j : Fin g, A⁻¹ (Fin.last g) j.castSucc =
-        -(∑ l, A (Fin.last g) l.castSucc * (schurStepLast A)⁻¹ l j) /
-          A (Fin.last g) (Fin.last g)) ∧
-      A⁻¹ (Fin.last g) (Fin.last g) = 1 / A (Fin.last g) (Fin.last g) +
-        (∑ i, ∑ j, A (Fin.last g) i.castSucc * (schurStepLast A)⁻¹ i j *
-          A j.castSucc (Fin.last g)) / A (Fin.last g) (Fin.last g) ^ 2 := by
-  classical
-  set A₁₁ : Matrix (Fin g) (Fin g) ℂ := fun i j => A i.castSucc j.castSucc with hA₁₁
-  set A₁₂ : Matrix (Fin g) (Fin 1) ℂ := fun i _ => A i.castSucc (Fin.last g) with hA₁₂
-  set A₂₁ : Matrix (Fin 1) (Fin g) ℂ := fun _ j => A (Fin.last g) j.castSucc with hA₂₁
-  set A₂₂ : Matrix (Fin 1) (Fin 1) ℂ := fun _ _ => A (Fin.last g) (Fin.last g) with hA₂₂
-  have hcast : ∀ i : Fin g, finSumFinEquiv (Sum.inl i : Fin g ⊕ Fin 1) = i.castSucc := by
-    intro i; rw [finSumFinEquiv_apply_left]; rfl
-  have hlast : finSumFinEquiv (Sum.inr (0 : Fin 1)) = Fin.last g := by
-    have h := congrArg finSumFinEquiv (finSumFinEquiv_symm_last (n := g))
-    rwa [Equiv.apply_symm_apply] at h
-  have hblock : A.submatrix finSumFinEquiv finSumFinEquiv =
-      Matrix.fromBlocks A₁₁ A₁₂ A₂₁ A₂₂ := by
-    ext (i | i) (j | j) <;>
-      simp only [Matrix.submatrix_apply, Matrix.fromBlocks_apply₁₁, Matrix.fromBlocks_apply₁₂,
-        Matrix.fromBlocks_apply₂₁, Matrix.fromBlocks_apply₂₂, hA₁₁, hA₁₂, hA₂₁, hA₂₂,
-        hcast, Fin.eq_zero, hlast]
-  have hA22det : A₂₂.det = A (Fin.last g) (Fin.last g) := by rw [hA₂₂, Matrix.det_fin_one]
-  have hA22unit : IsUnit A₂₂ := by
-    rw [Matrix.isUnit_iff_isUnit_det, hA22det]; exact ha.isUnit
-  haveI hA22 : Invertible A₂₂ := hA22unit.invertible
-  have hA22inv : A₂₂⁻¹ = fun _ _ => (A (Fin.last g) (Fin.last g))⁻¹ := by
-    apply Matrix.inv_eq_right_inv
-    ext i j
-    have hi : (i : Fin 1) = 0 := Fin.eq_zero i
-    have hj : (j : Fin 1) = 0 := Fin.eq_zero j
-    simp [Matrix.mul_apply, Matrix.one_apply, hi, hj, hA₂₂, mul_inv_cancel₀ ha]
-  have hschur : A₁₁ - A₁₂ * A₂₂⁻¹ * A₂₁ = schurStepLast A := by
-    rw [hA22inv]
-    ext i j
-    simp only [hA₁₁, hA₁₂, hA₂₁, Matrix.sub_apply, Matrix.mul_apply, Fin.sum_univ_one,
-      schurStepLast, div_eq_mul_inv]
-    ring
-  rw [← Matrix.invOf_eq_nonsing_inv] at hschur
-  have hSchurUnit : IsUnit (A₁₁ - A₁₂ * ⅟A₂₂ * A₂₁).det := by rw [hschur]; exact hA''.isUnit
-  haveI hSchurInv : Invertible (A₁₁ - A₁₂ * ⅟A₂₂ * A₂₁) :=
-    (Matrix.isUnit_iff_isUnit_det _).mpr hSchurUnit |>.invertible
-  haveI hFB : Invertible (Matrix.fromBlocks A₁₁ A₁₂ A₂₁ A₂₂) :=
-    Matrix.fromBlocks₂₂Invertible A₁₁ A₁₂ A₂₁ A₂₂
-  have hinvblock := Matrix.invOf_fromBlocks₂₂_eq A₁₁ A₁₂ A₂₁ A₂₂
-  rw [Matrix.invOf_eq_nonsing_inv] at hinvblock
-  have hAinv_sub : A⁻¹.submatrix finSumFinEquiv finSumFinEquiv =
-      (Matrix.fromBlocks A₁₁ A₁₂ A₂₁ A₂₂)⁻¹ := by
-    rw [← Matrix.inv_submatrix_equiv, hblock]
-  rw [hinvblock, Matrix.invOf_eq_nonsing_inv, Matrix.invOf_eq_nonsing_inv] at hAinv_sub
-  rw [Matrix.invOf_eq_nonsing_inv] at hschur
-  rw [hschur] at hAinv_sub
-  refine ⟨?_, ?_, ?_, ?_⟩
-  · intro i j
-    have h1 := congrFun (congrFun hAinv_sub (Sum.inl i)) (Sum.inl j)
-    simpa [Matrix.submatrix_apply, hcast, Matrix.fromBlocks_apply₁₁] using h1
-  · intro i
-    have h1 := congrFun (congrFun hAinv_sub (Sum.inl i)) (Sum.inr 0)
-    simp only [Matrix.submatrix_apply, hcast, hlast, Matrix.fromBlocks_apply₁₂] at h1
-    rw [h1]
-    simp only [Matrix.neg_apply, Matrix.mul_apply, hA22inv, hA₁₂, Fin.sum_univ_one, div_eq_mul_inv]
-    ring
-  · intro j
-    have h1 := congrFun (congrFun hAinv_sub (Sum.inr 0)) (Sum.inl j)
-    simp only [Matrix.submatrix_apply, hcast, hlast, Matrix.fromBlocks_apply₂₁] at h1
-    rw [h1]
-    simp only [Matrix.neg_apply, Matrix.mul_apply, hA22inv, hA₂₁, Fin.sum_univ_one, div_eq_mul_inv]
-    rw [neg_mul, Finset.sum_mul]
-    congr 1
-    exact Finset.sum_congr rfl fun x _ => by ring
-  · have h1 := congrFun (congrFun hAinv_sub (Sum.inr 0)) (Sum.inr 0)
-    simp only [Matrix.submatrix_apply, hlast, Matrix.fromBlocks_apply₂₂] at h1
-    rw [h1]
-    simp only [Matrix.add_apply, Matrix.mul_apply, hA22inv, hA₁₂, hA₂₁, Fin.sum_univ_one,
-      div_eq_mul_inv]
-    have key : ∑ x, (∑ x_1, (A (Fin.last g) (Fin.last g))⁻¹ * A (Fin.last g) x_1.castSucc *
-          (schurStepLast A)⁻¹ x_1 x) * A x.castSucc (Fin.last g) =
-        (A (Fin.last g) (Fin.last g))⁻¹ *
-          ∑ i, ∑ j, A (Fin.last g) i.castSucc * (schurStepLast A)⁻¹ i j *
-            A j.castSucc (Fin.last g) := by
-      rw [Finset.mul_sum]
-      simp only [Finset.mul_sum]
-      rw [Finset.sum_comm]
-      refine Finset.sum_congr rfl fun x _ => ?_
-      rw [Finset.sum_mul]
-      exact Finset.sum_congr rfl fun x_1 _ => by ring
-    rw [key]
-    ring
-
-lemma pivotSqrt_sq (g : ℕ) (A : Matrix (Fin g) (Fin g) ℂ) (hA : A.IsSymm)
-    (hRe : (A.map Complex.re).PosDef) :
-    pivotSqrt g A ^ 2 = A.det := by
-  induction g with
-  | zero => simp [pivotSqrt, Matrix.det_fin_zero]
-  | succ g ih =>
-    have hpivotRe : 0 < (A (Fin.last g) (Fin.last g)).re := hRe.diag_pos
-    have hpivot : A (Fin.last g) (Fin.last g) ≠ 0 := fun h => by simp [h] at hpivotRe
-    have hA' := schurStepLast_isSymm (A := A) hA
-    have hRe' := schurStepLast_re_posDef (A := A) hA hRe
-    rw [pivotSqrt, mul_pow]
-    have hsq : (A (Fin.last g) (Fin.last g) ^ (1 / 2 : ℂ)) ^ 2 = A (Fin.last g) (Fin.last g) := by
-      have h2 : (1 / 2 : ℂ) = ((2 : ℕ) : ℂ)⁻¹ := by norm_num
-      rw [h2]
-      exact Complex.cpow_nat_inv_pow (A (Fin.last g) (Fin.last g)) (two_ne_zero)
-    rw [hsq, ih (schurStepLast A) hA' hRe', det_eq_pivot_mul_det_schurStepLast hpivot]
-
-lemma pivotSqrt_ne_zero (g : ℕ) (A : Matrix (Fin g) (Fin g) ℂ) (hA : A.IsSymm)
-    (hRe : (A.map Complex.re).PosDef) :
-    pivotSqrt g A ≠ 0 := by
-  induction g with
-  | zero => simp [pivotSqrt]
-  | succ g ih =>
-    have hpivotRe : 0 < (A (Fin.last g) (Fin.last g)).re := hRe.diag_pos
-    have hpivot : A (Fin.last g) (Fin.last g) ≠ 0 := fun h => by simp [h] at hpivotRe
-    have hA' := schurStepLast_isSymm (A := A) hA
-    have hRe' := schurStepLast_re_posDef (A := A) hA hRe
-    rw [pivotSqrt]
-    exact mul_ne_zero ((Complex.cpow_ne_zero_iff_of_exponent_ne_zero (by norm_num)).mpr hpivot)
-      (ih (schurStepLast A) hA' hRe')
 
 private lemma tsum_fin_zero_eq (f : (Fin 0 → ℤ) → ℂ) : ∑' n, f n = f default :=
   tsum_eq_single default fun b' hb' => (hb' (Subsingleton.elim b' default)).elim
@@ -379,43 +127,11 @@ private lemma linear_split {g : ℕ} (b : Fin (g + 1) → ℂ) (n' : Fin g → �
       (∑ i, b i.castSucc * (n' i : ℂ)) + b (Fin.last g) * (k : ℂ) := by
   simp [Fin.sum_univ_castSucc, Fin.snoc_castSucc, Fin.snoc_last]
 
-/-- The Schur complement's quadratic form is the original one with the rank-one correction from
-completing the square in the last coordinate subtracted off. Pure algebra (uses `hA` only to
-identify the two symmetric halves of `schurStepLast`'s cross term). -/
-private lemma schurStepLast_quadratic_eq {g : ℕ} {A : Matrix (Fin (g + 1)) (Fin (g + 1)) ℂ}
-    (hA : A.IsSymm) (w : Fin g → ℂ) :
-    ∑ i, ∑ j, (schurStepLast A) i j * w i * w j =
-      (∑ i, ∑ j, A i.castSucc j.castSucc * w i * w j) -
-        (∑ i, A i.castSucc (Fin.last g) * w i) ^ 2 / A (Fin.last g) (Fin.last g) := by
-  have hentry : ∀ i j : Fin g, (schurStepLast A) i j * w i * w j =
-      A i.castSucc j.castSucc * w i * w j -
-        (A i.castSucc (Fin.last g) * w i) * (A j.castSucc (Fin.last g) * w j) /
-          A (Fin.last g) (Fin.last g) := by
-    intro i j
-    have hij : schurStepLast A i j =
-        A i.castSucc j.castSucc - A i.castSucc (Fin.last g) * A j.castSucc (Fin.last g) /
-          A (Fin.last g) (Fin.last g) := by
-      show A i.castSucc j.castSucc -
-          A i.castSucc (Fin.last g) * A (Fin.last g) j.castSucc / A (Fin.last g) (Fin.last g) =
-        A i.castSucc j.castSucc -
-          A i.castSucc (Fin.last g) * A j.castSucc (Fin.last g) / A (Fin.last g) (Fin.last g)
-      rw [hA.apply j.castSucc (Fin.last g)]
-    rw [hij, sub_mul, sub_mul]
-    congr 1
-    field_simp
-  simp_rw [hentry, Finset.sum_sub_distrib]
-  congr 1
-  rw [sq, Finset.sum_mul_sum, Finset.sum_div]
-  refine Finset.sum_congr rfl fun i _ => ?_
-  rw [Finset.sum_div]
-
 /-- The two-square-completion identity behind `tsum_exp_neg_quadratic_matrix`'s inductive step:
 after applying `Complex.tsum_exp_neg_quadratic` to the last coordinate, expanding the resulting
 `(m + I β(n'))²` and collecting terms gives exactly `-π · schurStepLast`'s quadratic form plus a
 new `m`-dependent shift, leaving a pure-`m` remainder that is later consumed by
-`matrix_inv_blocks`'s corner entry. Hand-derived and cross-checked twice (once via this side, once
-via the block-inverse expansion of the target `RHS`) before formalizing; see
-`PoissonSummationPlan.md`. -/
+`matrix_inv_blocks`'s corner entry. -/
 private lemma double_square_completion {g : ℕ} {A : Matrix (Fin (g + 1)) (Fin (g + 1)) ℂ}
     (hA : A.IsSymm) (ha : A (Fin.last g) (Fin.last g) ≠ 0) (b : Fin (g + 1) → ℂ)
     (n' : Fin g → ℤ) (m : ℤ) :
@@ -456,122 +172,10 @@ noncomputable def bShiftMap {g : ℕ} (b : Fin g → ℂ) : (Fin g → ℤ) →�
     refine Finset.sum_congr rfl fun i _ => ?_
     push_cast
     ring
-
-/-- A symmetric complex matrix with positive-definite real part has an inverse with
-positive-definite real part. -/
-private lemma nonsing_inv_re_posDef {g : ℕ} (A : Matrix (Fin g) (Fin g) ℂ)
-    (hA : A.IsSymm) (hRe : (A.map Complex.re).PosDef) :
-    (A⁻¹.map Complex.re).PosDef := by
-  refine Matrix.PosDef.of_dotProduct_mulVec_pos ?_ ?_
-  · rw [Matrix.isHermitian_iff_isSymm]
-    exact hA.inv.map _
-  · intro x hx
-    have hdetne : A.det ≠ 0 := by
-      intro h
-      have hsquare := pivotSqrt_sq g A hA hRe
-      rw [h] at hsquare
-      exact pivotSqrt_ne_zero g A hA hRe ((pow_eq_zero_iff two_ne_zero).mp hsquare)
-    have hdet : IsUnit A.det := isUnit_iff_ne_zero.mpr hdetne
-    let xc : Fin g → ℂ := fun i => (x i : ℂ)
-    let z : Fin g → ℂ := (A⁻¹).mulVec xc
-    let u : Fin g → ℝ := fun i => (z i).re
-    let v : Fin g → ℝ := fun i => (z i).im
-    have hAz : A.mulVec z = xc := by
-      simp only [z, Matrix.mulVec_mulVec, Matrix.mul_nonsing_inv A hdet,
-        Matrix.one_mulVec]
-    have hz : z ≠ 0 := by
-      intro hz
-      apply hx
-      have : xc = 0 := by rw [← hAz, hz, Matrix.mulVec_zero]
-      funext i
-      have hi := congrArg Complex.re (congrFun this i)
-      simpa [xc] using hi
-    have huv : u ≠ 0 ∨ v ≠ 0 := by
-      by_contra h
-      push Not at h
-      apply hz
-      funext i
-      apply Complex.ext
-      · simpa [u] using congrFun h.1 i
-      · simpa [v] using congrFun h.2 i
-    have hu (i : Fin g) : u i = ∑ j, (A⁻¹ i j).re * x j := by
-      simp only [u, z, Matrix.mulVec, dotProduct, xc, Complex.re_sum, Complex.mul_re,
-        ofReal_re, ofReal_im, mul_zero, sub_zero]
-    have hreal (i : Fin g) :
-        x i = ∑ j, ((A i j).re * u j - (A i j).im * v j) := by
-      have hi := congrFun hAz i
-      apply_fun Complex.re at hi
-      simpa only [Matrix.mulVec, dotProduct, xc, Complex.re_sum, Complex.mul_re, ofReal_re,
-        u, v] using hi.symm
-    have himag (i : Fin g) :
-        0 = ∑ j, ((A i j).re * v j + (A i j).im * u j) := by
-      have hi := congrFun hAz i
-      apply_fun Complex.im at hi
-      simpa only [Matrix.mulVec, dotProduct, xc, Complex.im_sum, Complex.mul_im, ofReal_im,
-        u, v] using hi.symm
-    have hcross :
-        (∑ i, u i * ∑ j, (A i j).im * v j) =
-          ∑ i, v i * ∑ j, (A i j).im * u j := by
-      simp only [Finset.mul_sum]
-      rw [Finset.sum_comm]
-      exact Finset.sum_congr rfl fun i _ => Finset.sum_congr rfl fun j _ => by
-        rw [hA.apply i j]
-        ring
-    have hzero :
-        (∑ i, v i * ∑ j, ((A i j).re * v j + (A i j).im * u j)) = 0 := by
-      apply Finset.sum_eq_zero
-      intro i _
-      rw [← himag i]
-      ring
-    have hquadratic :
-        (∑ i, x i * u i) =
-          (∑ i, u i * ∑ j, (A i j).re * u j) +
-            ∑ i, v i * ∑ j, (A i j).re * v j := by
-      simp_rw [hreal]
-      simp only [Finset.sum_sub_distrib, Finset.mul_sum]
-      have hsplit :
-          (∑ i, ((∑ j, (A i j).re * u j) -
-              ∑ j, (A i j).im * v j) * u i) =
-          (∑ i, u i * ∑ j, (A i j).re * u j) -
-            ∑ i, u i * ∑ j, (A i j).im * v j := by
-        rw [← Finset.sum_sub_distrib]
-        apply Finset.sum_congr rfl
-        intro i _
-        ring
-      rw [hsplit]
-      rw [hcross]
-      have hz' :
-          (∑ i, v i * ∑ j, (A i j).im * u j) =
-            -(∑ i, v i * ∑ j, (A i j).re * v j) := by
-        have := hzero
-        simp only [Finset.sum_add_distrib] at this
-        have hzero' :
-            (∑ i, v i * ∑ j, (A i j).re * v j) +
-                ∑ i, v i * ∑ j, (A i j).im * u j = 0 := by
-          simpa only [mul_add, Finset.sum_add_distrib] using this
-        linarith
-      rw [hz']
-      simp only [Finset.mul_sum]
-      ring
-    simp only [dotProduct, Matrix.mulVec, Matrix.map_apply, star_trivial]
-    rw [show (∑ i, x i * ∑ j, (A⁻¹ i j).re * x j) = ∑ i, x i * u i from
-      Finset.sum_congr rfl fun i _ => by rw [hu]]
-    rw [hquadratic]
-    rcases huv with hu0 | hv0
-    · exact add_pos_of_pos_of_nonneg
-        (hRe.dotProduct_mulVec_pos hu0) (hRe.posSemidef.dotProduct_mulVec_nonneg v)
-    · exact add_pos_of_nonneg_of_pos
-        (hRe.posSemidef.dotProduct_mulVec_nonneg u) (hRe.dotProduct_mulVec_pos hv0)
-
 /-- The one piece of genuinely new *analytic* (not just algebraic) infrastructure needed to close
 `tsum_exp_neg_quadratic_matrix`: absolute summability of the quadratic exponential lattice sum,
-needed to justify `tsum`-Fubini (`Summable.tsum_prod`) when peeling off the last coordinate.
-Built by instantiating `RiemannThetaAble` (`ThetaFunctions.lean`) with `Q_Im := quadraticMapOfMatrixR
-(2 • Re A)`, `Q_Re := quadraticMapOfMatrixR (-2 • Im A)`, `z := bShiftMap b`, chosen so that
-`π I (qRe + I qIm) + 2π I z` matches this file's `-π ∑ A n n + 2π ∑ b n` exactly (checked via
-`SiegelUpperHalfSpace.complex_quadratic`-style expansion, not reproduced verbatim here since that
-lemma lives in the unimported `SiegelModular.lean`). -/
-private lemma summable_quadratic_exp {g : ℕ} (hg : g ≠ 0) (A : Matrix (Fin g) (Fin g) ℂ)
+needed to justify `tsum`-Fubini (`Summable.tsum_prod`) when peeling off the last coordinate. -/
+lemma summable_quadratic_exp {g : ℕ} (hg : g ≠ 0) (A : Matrix (Fin g) (Fin g) ℂ)
     (hRe : (A.map Complex.re).PosDef) (b : Fin g → ℂ) :
     Summable (fun n : Fin g → ℤ =>
       exp (-π * ∑ i, ∑ j, A i j * (n i : ℂ) * (n j : ℂ) + 2 * π * ∑ i, b i * (n i : ℂ))) := by
@@ -584,7 +188,7 @@ private lemma summable_quadratic_exp {g : ℕ} (hg : g ≠ 0) (A : Matrix (Fin g
   have hsummable := ThetaAbleQuadraticForm.theta_fun_summable (R := ℤ) (M := Fin g → ℤ)
     (bShiftMap b)
   refine hsummable.congr fun n => ?_
-  have hle : ∀ i : Fin g, (latticeEmbedding (Fin g) n) i = (n i : ℝ) := fun i => rfl
+  have hle : ∀ i : Fin g, (toEuclidean_ZnRn n) i = (n i : ℝ) := fun i => rfl
   have hq_im : (latticeQuadraticMap (quadraticMapOfMatrix ((2 : ℝ) • (A.map Complex.re)))) n
       = ∑ i, ∑ j, (A.map Complex.re) i j * ((n i : ℝ) * (n j : ℝ)) := by
     rw [latticeQuadraticMap_apply, quadraticMapOfMatrix_apply]
@@ -721,7 +325,7 @@ theorem tsum_exp_neg_quadratic_matrix (A : Matrix (Fin g) (Fin g) ℂ) (hA : A.I
       ring
     have htransformed_summable : Summable (Function.uncurry fun n' m =>
         cexp (p1 n' - p2 n' m)) := by
-      let B : Matrix (Fin (g + 1)) (Fin (g + 1)) ℂ := fun i j => Fin.lastCases
+      let B : Matrix (Fin (g + 1)) (Fin (g + 1)) ℂ := Matrix.of fun i j => Fin.lastCases
         (Fin.lastCases (1 / a) (fun j => -I * v j / a) j)
         (fun i => Fin.lastCases (-I * v i / a) (fun j => schurStepLast A i j) j) i
       let d : Fin (g + 1) → ℂ := fun i => Fin.lastCases
@@ -734,10 +338,10 @@ theorem tsum_exp_neg_quadratic_matrix (A : Matrix (Fin g) (Fin g) ℂ) (hA : A.I
           ext i j
           refine Fin.lastCases ?_ (fun i => ?_) i <;>
             refine Fin.lastCases ?_ (fun j => ?_) j
-          · simp [B]
-          · simp [B]
-          · simp [B]
-          · simp only [Matrix.transpose_apply, Matrix.map_apply, B,
+          · simp [B, Matrix.of_apply]
+          · simp [B, Matrix.of_apply]
+          · simp [B, Matrix.of_apply]
+          · simp only [Matrix.transpose_apply, Matrix.map_apply, Matrix.of_apply, B,
               Fin.lastCases_castSucc]
             rw [hA'.apply i j]
         · intro x hx
@@ -753,12 +357,12 @@ theorem tsum_exp_neg_quadratic_matrix (A : Matrix (Fin g) (Fin g) ℂ) (hA : A.I
                 (∑ i, (x i : ℂ) * ∑ j, B i j * (x j : ℂ)) =
                   q + ((t : ℂ) - I * c) ^ 2 / a := by
               have hB_cc : ∀ i j : Fin g, B i.castSucc j.castSucc = schurStepLast A i j :=
-                fun i j => by simp [B]
+                fun i j => by simp [B, Matrix.of_apply]
               have hB_cl : ∀ i : Fin g, B i.castSucc (Fin.last g) = -I * v i / a :=
-                fun i => by simp [B]
+                fun i => by simp [B, Matrix.of_apply]
               have hB_lc : ∀ j : Fin g, B (Fin.last g) j.castSucc = -I * v j / a :=
-                fun j => by simp [B]
-              have hB_ll : B (Fin.last g) (Fin.last g) = 1 / a := by simp [B]
+                fun j => by simp [B, Matrix.of_apply]
+              have hB_ll : B (Fin.last g) (Fin.last g) = 1 / a := by simp [B, Matrix.of_apply]
               simp only [Fin.sum_univ_castSucc, hB_cc, hB_cl, hB_lc, hB_ll, mul_add,
                 Finset.mul_sum, Finset.sum_add_distrib]
               show (∑ i : Fin g, ∑ j : Fin g,
@@ -917,8 +521,9 @@ theorem tsum_exp_neg_quadratic_matrix (A : Matrix (Fin g) (Fin g) ℂ) (hA : A.I
       simp only [Function.uncurry_apply_pair]
       rw [he_apply, ← Complex.exp_add]
       apply congrArg cexp
-      simp only [p1, p2, B, d, c₀, hv_def, ha_def, Fin.sum_univ_castSucc, Fin.snoc_castSucc,
-        Fin.snoc_last, Fin.lastCases_castSucc, Fin.lastCases_last, schurStepLast]
+      simp only [p1, p2, B, d, c₀, Matrix.of_apply, hv_def, ha_def, Fin.sum_univ_castSucc,
+        Fin.snoc_castSucc, Fin.snoc_last, Fin.lastCases_castSucc, Fin.lastCases_last,
+        schurStepLast]
       have hcol : ∀ j : Fin g,
           A (Fin.last g) j.castSucc = A j.castSucc (Fin.last g) := fun j => by
         rw [hA.apply j.castSucc (Fin.last g)]
@@ -1266,93 +871,114 @@ theorem tsum_exp_neg_quadratic_matrix (A : Matrix (Fin g) (Fin g) ℂ) (hA : A.I
     simp only [targetDual, pivotSqrt]
     ring
 
-/-! ## An abstract Poisson-summation predicate on `EuclideanSpace ℝ (Fin g) → ℂ` -/
+/-- "Complete the square" expansion of a shifted quadratic form against a symmetric matrix `M`:
+splits `∑∑ M (n+c) (n+c)` into the bare quadratic part, twice a linear term in `n` (the two cross
+terms coincide after using `M`'s symmetry to relabel one of them), and a shift-only constant. Pure
+algebra, no analysis — the same completing-the-square move as `double_square_completion`, but for
+an additive shift rather than the Schur-complement pivot elimination. -/
+private lemma quadratic_shift_expand {g : ℕ} {M : Matrix (Fin g) (Fin g) ℂ} (hM : M.IsSymm)
+    (c : Fin g → ℂ) (n : Fin g → ℤ) :
+    (∑ i, ∑ j, M i j * ((n i : ℂ) + c i) * ((n j : ℂ) + c j)) =
+      (∑ i, ∑ j, M i j * (n i : ℂ) * (n j : ℂ)) +
+        2 * ∑ i, (∑ j, M i j * c j) * (n i : ℂ) +
+        ∑ i, ∑ j, M i j * c i * c j := by
+  have hterm : ∀ i j : Fin g,
+      M i j * ((n i : ℂ) + c i) * ((n j : ℂ) + c j) =
+        M i j * (n i : ℂ) * (n j : ℂ) + M i j * (n i : ℂ) * c j +
+          M i j * c i * (n j : ℂ) + M i j * c i * c j := fun i j => by ring
+  simp_rw [hterm, Finset.sum_add_distrib]
+  have hC1 : (∑ i, ∑ j, M i j * (n i : ℂ) * c j) = ∑ i, (∑ j, M i j * c j) * (n i : ℂ) := by
+    refine Finset.sum_congr rfl fun i _ => ?_
+    rw [Finset.sum_mul]
+    exact Finset.sum_congr rfl fun j _ => by ring
+  have hC2 : (∑ i, ∑ j, M i j * c i * (n j : ℂ)) = ∑ i, (∑ j, M i j * c j) * (n i : ℂ) := by
+    rw [Finset.sum_comm]
+    refine Finset.sum_congr rfl fun k _ => ?_
+    rw [Finset.sum_mul]
+    refine Finset.sum_congr rfl fun i _ => ?_
+    rw [hM.apply i k]
+  rw [hC1, hC2]
+  ring
 
-open scoped FourierTransform RealInnerProductSpace
+end Helpers
 
-/-- The point `n ∈ ℤ^g ⊆ ℝ^g`, viewed in `EuclideanSpace ℝ (Fin g)`. -/
-noncomputable def latticePoint (n : Fin g → ℤ) : EuclideanSpace ℝ (Fin g) :=
-  (EuclideanSpace.equiv (Fin g) ℝ).symm fun i => (n i : ℝ)
+section GaussianPoissonSummation
 
-/-- `f` has a Fourier transform (`f` is integrable, so Mathlib's `𝓕 f` — the Fourier transform on
-the real inner product space `EuclideanSpace ℝ (Fin g)`, `Mathlib.Analysis.Fourier.FourierTransform`
-— is genuinely the Fourier transform of `f` rather than a junk `0`) and Poisson summation holds for
-`f` against it: the lattice sums of `f` and of `𝓕 f` over `ℤ^g` both converge, and to the same
-value. -/
-def HasPoissonSummation (f : EuclideanSpace ℝ (Fin g) → ℂ) : Prop :=
-  MeasureTheory.Integrable f ∧
-    Summable (fun n : Fin g → ℤ => f (latticePoint n)) ∧
-    Summable (fun n : Fin g → ℤ => 𝓕 f (latticePoint n)) ∧
-    ∑' n : Fin g → ℤ, f (latticePoint n) = ∑' n : Fin g → ℤ, 𝓕 f (latticePoint n)
+open Complex
+open scoped Real FourierTransform
 
-private lemma summable_finsetSum {ι α : Type*} [AddCommGroup α] [UniformSpace α]
-    [IsUniformAddGroup α] (s : Finset ι) (h : ι → (Fin g → ℤ) → α)
-    (hh : ∀ i ∈ s, Summable (h i)) : Summable (fun n => ∑ i ∈ s, h i n) := by
-  classical
-  induction s using Finset.induction_on with
-  | empty => simp
-  | insert a s ha ih =>
-    simp only [Finset.sum_insert ha]
-    exact (hh a (Finset.mem_insert_self a s)).add
-      (ih fun i hi => hh i (Finset.mem_insert_of_mem hi))
-
-/-- `HasPoissonSummation` is closed under finite `ℂ`-linear combinations. -/
-lemma HasPoissonSummation.finsetSum {ι : Type*} (s : Finset ι) (c : ι → ℂ)
-    (f : ι → EuclideanSpace ℝ (Fin g) → ℂ) (hf : ∀ i ∈ s, HasPoissonSummation (f i)) :
-    HasPoissonSummation (fun x => ∑ i ∈ s, c i • f i x) := by
-  have hIntegrable : ∀ i ∈ s, MeasureTheory.Integrable (fun x => c i • f i x) :=
-    fun i hi => ((hf i hi).1).smul (c i)
-  have hFourier : ∀ w, 𝓕 (fun x => ∑ i ∈ s, c i • f i x) w = ∑ i ∈ s, c i • 𝓕 (f i) w := by
-    intro w
-    simp only [Real.fourier_eq]
-    rw [show (fun v => 𝐞 (-⟪v, w⟫) • ∑ i ∈ s, c i • f i v) =
-        fun v => ∑ i ∈ s, c i • (𝐞 (-⟪v, w⟫) • f i v) from
-      funext fun v => by
-        rw [Finset.smul_sum]
-        exact Finset.sum_congr rfl fun i _ => by simp [Circle.smul_def, mul_left_comm]]
-    have hsplit :
-        (∫ v, ∑ i ∈ s, c i • (𝐞 (-⟪v, w⟫) • f i v)) =
-          ∑ i ∈ s, ∫ v, c i • (𝐞 (-⟪v, w⟫) • f i v) :=
-      MeasureTheory.integral_finsetSum s fun i hi =>
-        ((Real.fourierIntegral_convergent_iff w).mpr (hf i hi).1).smul (c i)
-    rw [hsplit]
-    exact Finset.sum_congr rfl fun i _ => by rw [MeasureTheory.integral_smul]
-  refine ⟨MeasureTheory.integrable_finsetSum s hIntegrable,
-    summable_finsetSum s (fun i n => c i • f i (latticePoint n))
-      (fun i hi => ((hf i hi).2.1).const_smul (c i)),
-    ?_, ?_⟩
-  · refine (summable_finsetSum s (fun i n => c i • 𝓕 (f i) (latticePoint n))
-      (fun i hi => ((hf i hi).2.2.1).const_smul (c i))).congr fun n => ?_
-    rw [hFourier]
-  · simp_rw [hFourier]
-    rw [tsum_congr fun n => rfl,
-      Summable.tsum_finsetSum fun i hi => ((hf i hi).2.1).const_smul (c i),
-      Summable.tsum_finsetSum fun i hi => ((hf i hi).2.2.1).const_smul (c i)]
-    refine Finset.sum_congr rfl fun i hi => ?_
-    rw [tsum_const_smul'' (c i), tsum_const_smul'' (c i), (hf i hi).2.2.2]
-
-/-! `HasPoissonSummation.finsetSum` above is restricted to *finite* linear combinations. Extending
-it to a genuine infinite series `fun x => ∑' i, c i • f i x` (`c : ι → ℂ`, `ι` countable) needs a
-domination hypothesis on `(c i)` against per-`i` bounds on `f i` — e.g. `M N : ι → ℝ` with
-`∫ x, ‖f i x‖ ≤ M i`, `∑' n, ‖f i (latticePoint n)‖ ≤ N i`, and `Summable (‖c ·‖ * M ·)`,
-`Summable (‖c ·‖ * N ·)` — to run three interchanges: `MeasureTheory.integral_tsum_of_
-summable_integral_norm` swaps `∫` past `∑'`; `𝓕` commutes with an L¹-convergent series via
-`Lp.fourierTransformCLM : Lp E 1 →L[ℂ] V →ᵇ E` and `ContinuousLinearMap.map_tsum`; and
-`Summable.tsum_comm` swaps the lattice `tsum` past the `∑' i`, given joint summability over
-`ι × (Fin g → ℤ)` from the domination hypothesis. All three lemmas already exist in Mathlib; none
-of this is written yet. -/
-
-/-- The Gaussian on `EuclideanSpace ℝ (Fin g)` with covariance `A` and phase/shift `b`, matching
-the exponent `tsum_exp_neg_quadratic_matrix` resums over the lattice `ℤ^g`. -/
-noncomputable def modulatedGaussian (A : Matrix (Fin g) (Fin g) ℂ) (b : Fin g → ℂ)
-    (x : EuclideanSpace ℝ (Fin g)) : ℂ :=
-  exp (-π * ∑ i, ∑ j, A i j * (x.ofLp i : ℂ) * (x.ofLp j : ℂ) +
-    2 * π * ∑ i, b i * (x.ofLp i : ℂ))
-
-/-- The modulated Gaussian satisfies `HasPoissonSummation`: it has a Fourier transform (the
-classical `1 / pivotSqrt g A * exp(-π ∑∑ A⁻¹ (ξ + I b) (ξ + I b))`, matching
-`tsum_exp_neg_quadratic_matrix`'s right-hand side) and Poisson summation holds for it. -/
-theorem modulatedGaussian_hasPoissonSummation (A : Matrix (Fin g) (Fin g) ℂ) (hA : A.IsSymm)
-    (hRe : (A.map Complex.re).PosDef) (b : Fin g → ℂ) :
+theorem modulatedGaussian_hasPoissonSummation (hg : g ≠ 0) (A : Matrix (Fin g) (Fin g) ℂ)
+    (hA : A.IsSymm) (hRe : (A.map Complex.re).PosDef) (b : Fin g → ℂ) :
     HasPoissonSummation (modulatedGaussian A b) := by
-  sorry
+  have hAinv_symm : A⁻¹.IsSymm := hA.inv
+  have hAinv_re : (A⁻¹.map Complex.re).PosDef := nonsing_inv_re_posDef A hA hRe
+  have hpivot_ne : pivotSqrt g A ≠ 0 := pivotSqrt_ne_zero g A hA hRe
+  have hInt : MeasureTheory.Integrable (modulatedGaussian A b) :=
+    modulatedGaussian_integrable hg A hRe b
+  have hF := modulatedGaussian_fourierTransform hg A hA hRe b
+  have hlp : ∀ n : Fin g → ℤ, (toEuclidean_ZnRn n).ofLp = fun i => (n i : ℝ) := fun n => rfl
+  have hval : ∀ n : Fin g → ℤ, modulatedGaussian A b (toEuclidean_ZnRn n) =
+      exp (-π * ∑ i, ∑ j, A i j * (n i : ℂ) * (n j : ℂ) + 2 * π * ∑ i, b i * (n i : ℂ)) := by
+    intro n
+    simp only [modulatedGaussian, hlp]
+    norm_num
+  have hFval : ∀ n : Fin g → ℤ, 𝓕 (modulatedGaussian A b) (toEuclidean_ZnRn n) =
+      1 / pivotSqrt g A * exp (-π * ∑ i, ∑ j,
+        A⁻¹ i j * ((n i : ℂ) + I * b i) * ((n j : ℂ) + I * b j)) := by
+    intro n
+    rw [hF, hlp]
+    simp
+  have hsummable_lhs : Summable (fun n : Fin g → ℤ => modulatedGaussian A b (toEuclidean_ZnRn n)) := by
+    simp_rw [hval]
+    exact summable_quadratic_exp hg A hRe b
+  -- The shift making `A⁻¹ (n + I b) (n + I b)` match `summable_quadratic_exp`'s
+  -- `-π ∑∑ M n n + 2π ∑ e n` shape after completing the square (`quadratic_shift_expand`).
+  set e : Fin g → ℂ := fun i => -I * ∑ j, A⁻¹ i j * b j with he_def
+  have hK : (∑ i, ∑ j, A⁻¹ i j * (I * b i) * (I * b j)) =
+      -∑ i, ∑ j, A⁻¹ i j * b i * b j := by
+    rw [← Finset.sum_neg_distrib]
+    refine Finset.sum_congr rfl fun i _ => ?_
+    rw [← Finset.sum_neg_distrib]
+    refine Finset.sum_congr rfl fun j _ => ?_
+    ring_nf
+    rw [Complex.I_sq]
+    ring
+  have hd : ∀ i : Fin g, (∑ j, A⁻¹ i j * (I * b j)) = -e i := by
+    intro i
+    rw [he_def]
+    simp
+    rw [Finset.mul_sum]
+    exact Finset.sum_congr rfl fun j _ => by ring
+  have hexp_eq : ∀ n : Fin g → ℤ,
+      -π * (∑ i, ∑ j, A⁻¹ i j * ((n i : ℂ) + I * b i) * ((n j : ℂ) + I * b j)) =
+        π * (∑ i, ∑ j, A⁻¹ i j * b i * b j) +
+          (-π * (∑ i, ∑ j, A⁻¹ i j * (n i : ℂ) * (n j : ℂ)) + 2 * π * ∑ i, e i * (n i : ℂ)) := by
+    intro n
+    rw [quadratic_shift_expand hAinv_symm (fun i => I * b i) n, hK]
+    simp_rw [hd]
+    ring_nf
+    set term0 := (↑π * ∑ x, ∑ x_1, A⁻¹ x x_1 * ↑(n x) * ↑(n x_1))
+    set term1 := (↑π * ∑ x, -(e x * ↑(n x))) * 2
+    set term2 := ↑π * ∑ x, ∑ x_1, A⁻¹ x x_1 * b x * b x_1
+    set neg_term1 := (↑π * ∑ x, (e x * ↑(n x))) * 2
+    have term1_eq : neg_term1 = - term1 := by
+      unfold term1 neg_term1
+      rw [Finset.sum_neg_distrib]
+      ring
+    rw [term1_eq]
+    abel_nf
+  have hsummable_rhs : Summable (fun n : Fin g → ℤ => 𝓕 (modulatedGaussian A b) (toEuclidean_ZnRn n)) := by
+    have hbase := summable_quadratic_exp hg A⁻¹ hAinv_re e
+    have hrw : ∀ n : Fin g → ℤ, 𝓕 (modulatedGaussian A b) (toEuclidean_ZnRn n) =
+        (1 / pivotSqrt g A * exp (π * ∑ i, ∑ j, A⁻¹ i j * b i * b j)) *
+          exp (-π * ∑ i, ∑ j, A⁻¹ i j * (n i : ℂ) * (n j : ℂ) + 2 * π * ∑ i, e i * (n i : ℂ)) := by
+      intro n
+      rw [hFval, hexp_eq, Complex.exp_add]
+      ring
+    simp_rw [hrw]
+    exact hbase.mul_left _
+  refine ⟨hInt, hsummable_lhs, hsummable_rhs, ?_⟩
+  simp_rw [hval, hFval]
+  rw [tsum_exp_neg_quadratic_matrix A hA hRe b, tsum_mul_left]
+
+end GaussianPoissonSummation

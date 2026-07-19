@@ -2,50 +2,45 @@ import Mathlib.LinearAlgebra.SymplecticGroup
 import ZetaThetaFunctions.ThetaFunctions
 import ZetaThetaFunctions.Sp2gR
 import ZetaThetaFunctions.SiegelUpperHalfSpace
+import ZetaThetaFunctions.PoissonSummation
 
 /-!
 # Siegel Modular Group
 
-This file defines the genus-`g` Siegel upper half-space `SiegelUpperHalfSpace g` and the
-symplectic group `Sp2gR (R := R) g` (over any coefficient ring `R` with `[Algebra R ℝ]
-[Algebra R ℂ] [IsScalarTower R ℝ ℂ]`, via Mathlib's `Matrix.symplecticGroup`), together with the
-classical fractional-linear `MulAction` of `Sp2gR (R := R) g` on `SiegelUpperHalfSpace g`,
-`τ ↦ (Aτ+B)(Cτ+D)⁻¹`. The same construction, specialized to `R := ℝ` and `R := ℤ`
-(abbreviated `Sp2gZ`), covers both the real and the integral (Siegel modular) symplectic groups
-uniformly.
+The classical fractional-linear `MulAction` of the symplectic group `Sp2gR (R := R) g`
+(`ZetaThetaFunctions/Sp2gR.lean`) on the Siegel upper half-space `SiegelUpperHalfSpace g`
+(`ZetaThetaFunctions/SiegelUpperHalfSpace.lean`, imported not defined here), `τ ↦ (Aτ+B)(Cτ+D)⁻¹`,
+and its induced action on Riemann theta data (`ZetaThetaFunctions/ThetaFunctions.lean`). The same
+construction, specialized to `R := ℝ` and `R := ℤ` (abbreviated `Sp2gZ`), covers both the real and
+the integral (Siegel modular) symplectic groups uniformly.
 
 ## Main definitions
 
-* `SiegelUpperHalfSpace g`: a Siegel point, bundled exactly as the data `RiemannThetaAble`
-  (`ZetaFunctions/ThetaFunctions.lean`) consumes: `Q_Re`, `Q_Im`, `hQIm_cont`, `hQIm`.
-* `Sp2gR (R := R) g`: `Sp(2g, R)`, via `Matrix.symplecticGroup (Fin g) R`.
+* `siegelMatrixAction`/`siegelSMul`/the `MulAction (Sp2gR (R := R) g) (SiegelUpperHalfSpace g)`
+  instance: the fractional-linear action, built from the block decomposition of a symplectic
+  matrix (cast entrywise into `ℂ` via the ring hom `(algebraMap R ℂ).mapMatrix`) and `τ`'s Gram
+  matrix `τ.toMatrix = Q_Re + I Q_Im`.
 * `Sp2gZ g := Sp2gR (R := ℤ) g`: the integral (Siegel modular) group.
-* `siegelSMul`/the `MulAction (Sp2gR (R := R) g) (SiegelUpperHalfSpace g)` instance: the
-  fractional-linear action, built from the block decomposition of a symplectic matrix (cast
-  entrywise into `ℂ` via the ring hom `(algebraMap R ℂ).mapMatrix`) and `τ`'s Gram matrix
-  `τ.toMatrix = Q_Re + I Q_Im`.
+* `RiemannThetaAble_siegelSMul`: the induced action of `Sp2gR (R := R) g` on
+  `ThetaAbleQuadraticForm`-bundled Riemann theta data, and the theta transformation laws under the
+  classical `T`/`GL`/`S` generators (`section ThetaTransform`).
 
 ## Sections
 
-* `UpperHalfSpace`: the bundled Siegel upper half-space and its extensionality lemma.
-* `SymplecticBlocks`: block projections, multiplication formulas, and symplectic relations.
-* `MatrixQuadraticForms`: conversion between symmetric matrices and real quadratic forms.
-* `FractionalLinearMatrixAction`: the matrix-level action and preservation of the Siegel
-  conditions.
-* `BundledSiegelAction`: the induced `MulAction` on bundled Siegel points.
-* `IntegralSiegelAction`: integral lattice preliminaries and the action of `Sp(2g, R)` on Riemann
-  theta data.
+* `SymplecticBlocks`: block projections and Hermitian-transpose-vs-plain-transpose lemmas for
+  `(algebraMap R ℂ)`-cast blocks.
+* `FractionalLinearMatrixAction`: the matrix-level action `siegelMatrixAction` and preservation of
+  the Siegel conditions (symmetry, `CZ+D` invertible, `Im` stays positive definite), including the
+  `T`/`GL`/`S`-generator block matrices (`Sp2gR.Tmatrix`/`GLmatrix`/`Smatrix`) and identity case.
+* `BundledSiegelAction`: the induced `MulAction (Sp2gR (R := R) g) (SiegelUpperHalfSpace g)`
+  instance on bundled Siegel points, and the cocycle identity behind `mul_smul`.
+* `IntegralSiegel`: the integral group `Sp2gZ`, integer-PosDef-to-real transfer
+  (`IntMatrixPosDefTransfer`), and the lattice/Euclidean quadratic-form correspondence
+  (`IntegralQuadraticFormExtension`) needed to act on `ThetaAbleQuadraticForm` data.
+* `ThetaTransform`: `RiemannThetaAble_siegelSMul` and the theta transformation law under each
+  generator (`ThetaTransformTMatrix`, `ThetaTransformGLMatrix` — both fully proved termwise;
+  `ThetaTransformSMatrix` — needs genuine Poisson resummation).
 
-## Status
-
-Fully proved, no gaps: `one_smul`, `mul_smul`, `SiegelUpperHalfSpace.toMatrix_isSymm`,
-`siegelMatrixAction_isSymm` (the action preserves matrix symmetry, via the symplectic relations
-`AᵀC=CᵀA`, `BᵀD=DᵀB`, `AᵀD-CᵀB=1` derived in `Sp2gR.block_relations`), `siegelDenom_isUnit`
-(`CZ+D` invertible on the half-space, via the Hermitian identity `Wᴴ*Num-Numᴴ*W=2i•Y` in
-`siegelDenom_conjTranspose_key`), and `siegelMatrixAction_im_posDef`/`_continuous` (the transformed
-`Q_Im` stays a genuine Siegel point, via the congruence identity
-`Im Z' = (CZ+D)⁻¹ᴴ ⬝ Im Z ⬝ (CZ+D)⁻¹`). The `MulAction (Sp2gR (R := R) g) (SiegelUpperHalfSpace g)`
-instance is genuinely complete.
 -/
 
 variable {R : Type*} [CommRing R] [Algebra R ℝ] [Algebra R ℂ] [IsScalarTower R ℝ ℂ]
@@ -695,183 +690,6 @@ abbrev Sp2gZ (g : ℕ) : Type := Sp2gR (R := ℤ) g
 
 noncomputable example (g : ℕ) : MulAction (Sp2gZ g) (SiegelUpperHalfSpace g) := inferInstance
 
-section IntMatrixPosDefTransfer
-
-/-- A positive-definite *integer* matrix stays positive-definite after casting into `ℝ`. This is
-genuinely not formal: `Matrix.PosDef` over `ℤ` only quantifies over `x : Fin g → ℤ`, while over `ℝ`
-it quantifies over the whole continuum `Fin g → ℝ`. The argument: (1) clear denominators
-(`rat_common_denominator`, from `EpsteinZeta.lean`) to get positivity on `Fin g → ℚ`, then extend to
-all of `Fin g → ℝ` by continuity and density of `ℚ^g` in `ℝ^g`, giving `PosSemidef` over `ℝ`; (2)
-`S.det ≠ 0` over `ℤ` (else `Matrix.exists_mulVec_eq_zero_iff`, valid since `ℤ` is a domain, gives an
-integer kernel vector `z ≠ 0` with `z ⬝ᵥ S.mulVec z = 0`, contradicting strict positivity at `z`),
-transported to `(S.map cast).det ≠ 0` over `ℝ` via `Int.cast_det` and injectivity of the cast, which
-rules out a real zero of the semidefinite form (`PosSemidef.dotProduct_mulVec_zero_iff` +
-`Matrix.eq_zero_of_mulVec_eq_zero`), upgrading (1) to strict `PosDef`. This is genuinely specific to
-`S` having *integer* entries — see `latticeQuadToEuclidean`'s docstring below for why the analogous
-claim is false for an arbitrary `ℝ`-valued lattice quadratic form. -/
-theorem Matrix.PosDef.int_cast_posDef {g : ℕ} {S : Matrix (Fin g) (Fin g) ℤ} (hS : S.PosDef) :
-    (S.map (Int.cast : ℤ → ℝ)).PosDef := by
-  have hSsymm : S.IsSymm := Matrix.isHermitian_iff_isSymm.mp hS.isHermitian
-  have hSmapSymm : (S.map (Int.cast : ℤ → ℝ)).IsHermitian := by
-    rw [Matrix.isHermitian_iff_isSymm]
-    show (S.map _).transpose = S.map _
-    rw [← Matrix.transpose_map, hSsymm]
-  have hrat_pos : ∀ x : EuclideanSpace ℚ (Fin g), x ≠ 0 →
-      0 < x.ofLp ⬝ᵥ ((S.map fun e => (e : ℚ)).mulVec x.ofLp) := by
-    intro x hx
-    obtain ⟨N, hNpos, xz, hxz⟩ := rat_common_denominator x
-    have hxzne : xz ≠ 0 := by
-      intro h
-      apply hx
-      rw [← WithLp.ofLp_eq_zero]
-      funext i
-      rw [hxz i, h]
-      simp
-    have hSxz : 0 < (xz ⬝ᵥ S.mulVec xz : ℤ) := hS.dotProduct_mulVec_pos hxzne
-    have hNne : (N : ℚ) ≠ 0 := by exact_mod_cast hNpos.ne'
-    have hkey : x.ofLp ⬝ᵥ ((S.map fun e => (e : ℚ)).mulVec x.ofLp)
-        = (N : ℚ)⁻¹ ^ 2 * (xz ⬝ᵥ S.mulVec xz : ℤ) := by
-      have hL : x.ofLp ⬝ᵥ ((S.map fun e => (e : ℚ)).mulVec x.ofLp)
-          = ∑ i, ∑ j, x.ofLp i * ((S i j : ℚ) * x.ofLp j) := by
-        simp [dotProduct, Matrix.mulVec, Matrix.map_apply, Finset.mul_sum]
-      have hR : ((xz ⬝ᵥ S.mulVec xz : ℤ) : ℚ)
-          = ∑ i, ∑ j, (xz i : ℚ) * ((S i j : ℚ) * (xz j : ℚ)) := by
-        simp only [dotProduct, Matrix.mulVec, Finset.mul_sum]
-        push_cast
-        rfl
-      rw [hL, hR, Finset.mul_sum]
-      refine Finset.sum_congr rfl fun i _ => ?_
-      rw [Finset.mul_sum]
-      refine Finset.sum_congr rfl fun j _ => ?_
-      rw [hxz i, hxz j]
-      field_simp
-    rw [hkey]
-    have hNpos' : (0 : ℚ) < (N : ℚ) := by exact_mod_cast hNpos
-    have hSxz' : (0 : ℚ) < (xz ⬝ᵥ S.mulVec xz : ℤ) := by exact_mod_cast hSxz
-    positivity
-  have hSemiR : ∀ v : Fin g → ℝ, 0 ≤ v ⬝ᵥ (S.map (Int.cast : ℤ → ℝ)).mulVec v := by
-    intro v
-    have hcont : Continuous (fun v : Fin g → ℝ => v ⬝ᵥ (S.map (Int.cast : ℤ → ℝ)).mulVec v) := by
-      simp only [dotProduct, Matrix.mulVec, Matrix.map_apply, Finset.mul_sum]
-      exact continuous_finsetSum _ fun i _ => continuous_finsetSum _ fun j _ =>
-        (continuous_apply i).mul (continuous_const.mul (continuous_apply j))
-    have hdense : DenseRange (fun y : Fin g → ℚ => (fun i => (y i : ℝ) : Fin g → ℝ)) :=
-      DenseRange.piMap (fun _ => Rat.denseRange_cast)
-    have hsub : Set.range (fun y : Fin g → ℚ => (fun i => (y i : ℝ) : Fin g → ℝ))
-        ⊆ (fun v : Fin g → ℝ => v ⬝ᵥ (S.map (Int.cast : ℤ → ℝ)).mulVec v) ⁻¹' Set.Ici 0 := by
-      rintro _ ⟨y, rfl⟩
-      simp only [Set.mem_preimage, Set.mem_Ici]
-      rcases eq_or_ne y 0 with hy | hy
-      · simp [hy]
-      · have hy' : (WithLp.toLp 2 y : EuclideanSpace ℚ (Fin g)) ≠ 0 := by
-          intro h
-          apply hy
-          have h' := congrArg WithLp.ofLp h
-          rwa [WithLp.ofLp_toLp, WithLp.ofLp_zero] at h'
-        have h2 := hrat_pos (WithLp.toLp 2 y) hy'
-        rw [WithLp.ofLp_toLp] at h2
-        have hcastrat : ((y ⬝ᵥ ((S.map fun e => (e : ℚ)).mulVec y) : ℚ) : ℝ)
-            = (fun i => (y i : ℝ)) ⬝ᵥ (S.map (Int.cast : ℤ → ℝ)).mulVec (fun i => (y i : ℝ)) := by
-          simp only [dotProduct, Matrix.mulVec, Matrix.map_apply, Finset.mul_sum]
-          push_cast
-          rfl
-        rw [← hcastrat]
-        exact_mod_cast h2.le
-    have huniv : (Set.univ : Set (Fin g → ℝ))
-        ⊆ (fun v : Fin g → ℝ => v ⬝ᵥ (S.map (Int.cast : ℤ → ℝ)).mulVec v) ⁻¹' Set.Ici 0 := by
-      rw [← hdense.closure_eq]
-      exact closure_minimal hsub (isClosed_Ici.preimage hcont)
-    exact huniv (Set.mem_univ v)
-  have hSemi : (S.map (Int.cast : ℤ → ℝ)).PosSemidef :=
-    Matrix.PosSemidef.of_dotProduct_mulVec_nonneg hSmapSymm hSemiR
-  have hdetS : S.det ≠ 0 := by
-    intro hdet
-    obtain ⟨z, hzne, hz⟩ := Matrix.exists_mulVec_eq_zero_iff.mpr hdet
-    have hSz : 0 < (z ⬝ᵥ S.mulVec z : ℤ) := hS.dotProduct_mulVec_pos hzne
-    rw [hz, dotProduct_zero] at hSz
-    exact lt_irrefl 0 hSz
-  have hdetR : (S.map (Int.cast : ℤ → ℝ)).det ≠ 0 := by
-    intro hdet
-    apply hdetS
-    have hcast : ((S.det : ℤ) : ℝ) = (S.map (Int.cast : ℤ → ℝ)).det := Int.cast_det S
-    rw [hdet] at hcast
-    exact_mod_cast hcast
-  refine Matrix.PosDef.of_dotProduct_mulVec_pos hSmapSymm fun v hv => ?_
-  rcases (hSemi.dotProduct_mulVec_nonneg v).lt_or_eq with h | h
-  · simpa using h
-  · exfalso
-    apply hv
-    exact Matrix.eq_zero_of_mulVec_eq_zero hdetR ((hSemi.dotProduct_mulVec_zero_iff v).mp h.symm)
-
-end IntMatrixPosDefTransfer
-
-section IntegralQuadraticFormExtension
-
-/-- The Gram matrix, at the standard basis of `Fin g → ℤ`, of a real-valued quadratic form on the
-lattice `Fin g → ℤ` — the analogue of `gramMatrixReal`/`EpsteinZeta.gramMatrix` for a quadratic
-form that is already `ℝ`-valued on the lattice (rather than `ℤ`-valued): `Q.polarBilin` is still
-well-defined and `ℤ`-bilinear regardless of `Q`'s codomain, so evaluating it at the standard basis
-vectors gives a genuine real matrix. -/
-def gramMatrixLattice (Q : QuadraticMap ℤ (Fin g → ℤ) ℝ) : Matrix (Fin g) (Fin g) ℝ :=
-  fun i j => Q.polarBilin (Pi.single i 1) (Pi.single j 1)
-
-/-- A lattice quadratic form `Q : QuadraticMap ℤ (Fin g → ℤ) ℝ`, "put back" into a genuine real
-quadratic form on `EuclideanSpace ℝ (Fin g)` via its Gram matrix (`gramMatrixLattice`) and
-`quadraticMapOfMatrix`. Continuity is automatic (`quadraticMapOfMatrix_continuous`); *positive*-
-definiteness is **not** automatic from `Q`'s positivity on the lattice alone (unlike the integral,
-`ℤ`-valued case handled by `EpsteinZeta.posDefR`) — an `ℝ`-valued lattice quadratic form positive at
-every nonzero lattice point can still fail to be positive-definite on the real span (e.g. a rank-one
-form vanishing along an irrational direction, which therefore never meets the lattice) — so callers
-must supply that fact separately. -/
-noncomputable def latticeQuadToEuclidean (Q : QuadraticMap ℤ (Fin g → ℤ) ℝ) :
-    QuadraticMap ℝ (EuclideanSpace ℝ (Fin g)) ℝ :=
-  quadraticMapOfMatrix (gramMatrixLattice Q)
-
-lemma latticeQuadToEuclidean_continuous (Q : QuadraticMap ℤ (Fin g → ℤ) ℝ) :
-    Continuous (latticeQuadToEuclidean Q) :=
-  quadraticMapOfMatrix_continuous _
-
-private lemma latticeQuadToEuclidean_restrict (Q : QuadraticMap ℤ (Fin g → ℤ) ℝ)
-    (z : Fin g → ℤ) :
-    latticeQuadToEuclidean Q (latticeEmbedding (Fin g) z) = Q z := by
-  have hgram_symm : (gramMatrixLattice Q).IsSymm := by
-    ext i j
-    simp only [gramMatrixLattice, Matrix.transpose_apply, QuadraticMap.polarBilin_apply_apply]
-    exact QuadraticMap.polar_comm Q _ _
-  have hgram_round_trip : gramMatrixReal (latticeQuadToEuclidean Q) =
-      gramMatrixLattice Q := by
-    exact gramMatrixReal_quadraticMapOfMatrix hgram_symm
-  have hrestrict_round_trip : latticeQuadraticMap (latticeQuadToEuclidean Q) = Q := by
-    have hpolar (u : Fin g → ℤ) : Q.polarBilin u u =
-        ∑ i, ∑ j, ((u i : ℝ) * (u j : ℝ)) * gramMatrixLattice Q i j := by
-      conv_lhs => rw [std_basis_sum u, std_basis_sum u]
-      simp only [map_sum, map_smul, LinearMap.sum_apply, LinearMap.smul_apply,
-        gramMatrixLattice]
-      rw [← std_basis_sum u]
-      simp only [zsmul_eq_mul]
-      simp_rw [Finset.mul_sum]
-      rw [Finset.sum_comm]
-      refine Finset.sum_congr rfl fun i _ => Finset.sum_congr rfl fun j _ => ?_
-      ring
-    have hsum (u : Fin g → ℤ) :
-        ∑ i, ∑ j, ((u i : ℝ) * (u j : ℝ)) * gramMatrixLattice Q i j = 2 * Q u := by
-      rw [← hpolar u, QuadraticMap.polarBilin_apply_apply, QuadraticMap.polar_self, two_smul]
-      ring
-    apply QuadraticMap.ext
-    intro u
-    change latticeQuadToEuclidean Q (latticeEmbedding (Fin g) u) = Q u
-    rw [latticeQuadToEuclidean, quadraticMapOfMatrix_apply]
-    change ⅟(2 : ℝ) * ∑ i, ∑ j,
-      gramMatrixLattice Q i j * ((u i : ℝ) * (u j : ℝ)) = Q u
-    rw [show (∑ i, ∑ j, gramMatrixLattice Q i j * ((u i : ℝ) * (u j : ℝ))) =
-        ∑ i, ∑ j, ((u i : ℝ) * (u j : ℝ)) * gramMatrixLattice Q i j from
-        Finset.sum_congr rfl fun i _ => Finset.sum_congr rfl fun j _ => mul_comm _ _, hsum u,
-      invOf_eq_inv]
-    ring
-  simpa [latticeQuadraticMap_apply] using congrArg (fun q => q z) hrestrict_round_trip
-
-end IntegralQuadraticFormExtension
-
 end IntegralSiegel
 
 section ThetaTransform
@@ -902,53 +720,31 @@ noncomputable def RiemannThetaAble_siegelSMul (hg : g ≠ 0) (M : Sp2gR (R:=R) g
   have hQIm_pre := thetaable.qIm_posdef infinite_multiples
   have hQrestrict : ∀ (z : Fin g → ℤ),
     (latticeQuadToEuclidean ThetaAbleQuadraticForm.qIm) ((EuclideanSpace.equiv (Fin g) ℝ).symm fun i => ↑(z i)) =
-      ThetaAbleQuadraticForm.qIm z := by
-    have hgram_symm : (gramMatrixLattice thetaable.qIm).IsSymm := by
-      ext i j
-      simp only [gramMatrixLattice, Matrix.transpose_apply, QuadraticMap.polarBilin_apply_apply]
-      exact QuadraticMap.polar_comm thetaable.qIm _ _
-    have hgram_round_trip : gramMatrixReal (latticeQuadToEuclidean thetaable.qIm) =
-        gramMatrixLattice thetaable.qIm := by
-      exact gramMatrixReal_quadraticMapOfMatrix hgram_symm
-    have hrestrict_round_trip : latticeQuadraticMap (latticeQuadToEuclidean thetaable.qIm) =
-        thetaable.qIm := by
-      let q := thetaable.qIm
-      have hpolar (z : Fin g → ℤ) : q.polarBilin z z =
-          ∑ i, ∑ j, ((z i : ℝ) * (z j : ℝ)) * gramMatrixLattice q i j := by
-        conv_lhs => rw [std_basis_sum z, std_basis_sum z]
-        simp only [map_sum, map_smul, LinearMap.sum_apply, LinearMap.smul_apply,
-          gramMatrixLattice]
-        rw [← std_basis_sum z]
-        simp only [zsmul_eq_mul]
-        simp_rw [Finset.mul_sum]
-        rw [Finset.sum_comm]
-        refine Finset.sum_congr rfl fun i _ => Finset.sum_congr rfl fun j _ => ?_
-        ring
-      have hsum (z : Fin g → ℤ) :
-          ∑ i, ∑ j, ((z i : ℝ) * (z j : ℝ)) * gramMatrixLattice q i j = 2 * q z := by
-        rw [← hpolar z, QuadraticMap.polarBilin_apply_apply, QuadraticMap.polar_self, two_smul]
-        ring
-      apply QuadraticMap.ext
-      intro z
-      change latticeQuadToEuclidean q (latticeEmbedding (Fin g) z) = q z
-      rw [latticeQuadToEuclidean, quadraticMapOfMatrix_apply]
-      change ⅟(2 : ℝ) * ∑ i, ∑ j,
-        gramMatrixLattice q i j * ((z i : ℝ) * (z j : ℝ)) = q z
-      rw [show (∑ i, ∑ j, gramMatrixLattice q i j * ((z i : ℝ) * (z j : ℝ))) =
-          ∑ i, ∑ j, ((z i : ℝ) * (z j : ℝ)) * gramMatrixLattice q i j from
-          Finset.sum_congr rfl fun i _ => Finset.sum_congr rfl fun j _ => mul_comm _ _, hsum z,
-        invOf_eq_inv]
-      ring
-    intro z
-    change (latticeQuadToEuclidean thetaable.qIm) (latticeEmbedding (Fin g) z) = thetaable.qIm z
-    simpa [latticeQuadraticMap_apply] using congrArg (fun Q => Q z) hrestrict_round_trip
+      ThetaAbleQuadraticForm.qIm z :=
+    latticeQuadToEuclidean_restrict thetaable.qIm
   have hQIm : (latticeQuadToEuclidean thetaable.qIm).PosDef := thetaable.qImRe_posdef
     (Q := latticeQuadToEuclidean thetaable.qIm)
     hQrestrict
-  let τ : SiegelUpperHalfSpace g :=
-    ⟨latticeQuadToEuclidean thetaable.qRe, latticeQuadToEuclidean thetaable.qIm,
-      latticeQuadToEuclidean_continuous thetaable.qIm, hQIm⟩
-  RiemannThetaAble hg (M • τ).Q_Re (M • τ).Q_Im (M • τ).hQIm_cont (M • τ).hQIm
+  -- The pre-transformation summand, as a chain of equal complex numbers (`Q := qRe + I qIm`,
+  -- a *quadratic form*; `τ.toMatrix`, a *matrix*, related by `complex_quadratic`):
+  --   exp (π I Q(x) + 2 π I ⟪z, x⟫)
+  --     = exp (π I (qRe(x) + I qIm(x)) + 2 π I ⟪z, x⟫)
+  --     = exp (π I * (2:ℂ)⁻¹ * ∑ i, ∑ j, τ.toMatrix i j * x i * x j + 2 π I ⟪z, x⟫)
+  -- `M • τ` transforms the *matrix* `τ.toMatrix` by the classical fractional-linear action
+  -- That action does not directly transform `Q`.
+  let qim := latticeQuadToEuclidean thetaable.qIm
+  let qim_half := (2:ℝ)⁻¹ • qim
+  let qre := latticeQuadToEuclidean thetaable.qRe
+  let qre_half := (2:ℝ)⁻¹ • qre
+  have hQIm_half_cont : Continuous qim_half :=
+    (latticeQuadToEuclidean_continuous thetaable.qIm).const_smul (2:ℝ)⁻¹
+  have hQIm_half_posdef : qim_half.PosDef :=
+    hQIm.smul (by norm_num)
+  let τ : SiegelUpperHalfSpace g := ⟨qre_half, qim_half, hQIm_half_cont, hQIm_half_posdef⟩
+  let τ' : SiegelUpperHalfSpace g := M • τ
+  have hQIm'_cont : Continuous ((2:ℝ) • τ'.Q_Im) := τ'.hQIm_cont.const_smul (2:ℝ)
+  have hQIm' : ((2:ℝ) • τ'.Q_Im).PosDef := τ'.hQIm.smul (by norm_num)
+  RiemannThetaAble hg ((2:ℝ) • τ'.Q_Re) ((2:ℝ) • τ'.Q_Im) hQIm'_cont hQIm'
 
 /-- The `x_summand` term of the theta series after applying `M` to `old_thetaable`.
 
@@ -986,55 +782,67 @@ private lemma tau_operator_Tmatrix
     (tau_operator (R := ℤ)
       (thetaable := RiemannThetaAble_siegelSMul (R := R) hg (Sp2gR.Tmatrix B hB)
         old_thetaable) x) y =
-      (tau_operator (R := ℤ) (thetaable := old_thetaable) x) y +
-        ∑ i, ∑ j, (algebraMap R ℂ (B i j)) * (x i : ℂ) * (y j : ℂ) := by
+    (tau_operator (R := ℤ) (thetaable := old_thetaable) x) y +
+      2 * ∑ i, ∑ j, (algebraMap R ℂ (B i j)) * (x i : ℂ) * (y j : ℂ) := by
   set old_tau_re := latticeQuadToEuclidean old_thetaable.qRe
   set old_tau_im := latticeQuadToEuclidean old_thetaable.qIm
   have old_tau_im_posdef : old_tau_im.PosDef := by
     apply old_thetaable.qImRe_posdef old_tau_im
     intro u
-    change old_tau_im (latticeEmbedding (Fin g) u) = old_thetaable.qIm u
+    change old_tau_im (toEuclidean_ZnRn u) = old_thetaable.qIm u
     simpa [old_tau_im] using latticeQuadToEuclidean_restrict old_thetaable.qIm u
   let old_tau : SiegelUpperHalfSpace g :=
     ⟨old_tau_re, old_tau_im, by
       simpa [old_tau_im] using latticeQuadToEuclidean_continuous old_thetaable.qIm,
       old_tau_im_posdef⟩
+  have old_tau_half_cont : Continuous ((2:ℝ)⁻¹ • old_tau_im) :=
+    (by simpa [old_tau_im] using latticeQuadToEuclidean_continuous old_thetaable.qIm :
+      Continuous old_tau_im).const_smul (2:ℝ)⁻¹
+  have old_tau_half_posdef : ((2:ℝ)⁻¹ • old_tau_im).PosDef := old_tau_im_posdef.smul (by norm_num)
+  let old_tau_half : SiegelUpperHalfSpace g :=
+    ⟨(2:ℝ)⁻¹ • old_tau_re, (2:ℝ)⁻¹ • old_tau_im, old_tau_half_cont, old_tau_half_posdef⟩
   change
     (tau_operator (R := ℤ)
-      (thetaable := RiemannThetaAble hg ((Sp2gR.Tmatrix B hB) • old_tau).Q_Re
-        ((Sp2gR.Tmatrix B hB) • old_tau).Q_Im
-        ((Sp2gR.Tmatrix B hB) • old_tau).hQIm_cont
-        ((Sp2gR.Tmatrix B hB) • old_tau).hQIm) x) y = _
+      (thetaable := RiemannThetaAble hg
+        ((2:ℝ) • ((Sp2gR.Tmatrix B hB) • old_tau_half).Q_Re)
+        ((2:ℝ) • ((Sp2gR.Tmatrix B hB) • old_tau_half).Q_Im)
+        (((Sp2gR.Tmatrix B hB) • old_tau_half).hQIm_cont.const_smul (2:ℝ))
+        (((Sp2gR.Tmatrix B hB) • old_tau_half).hQIm.smul (by norm_num))) x) y = _
   unfold tau_operator
   change
-    (((RiemannThetaAble hg ((Sp2gR.Tmatrix B hB) • old_tau).Q_Re
-      ((Sp2gR.Tmatrix B hB) • old_tau).Q_Im
-      ((Sp2gR.Tmatrix B hB) • old_tau).hQIm_cont
-      ((Sp2gR.Tmatrix B hB) • old_tau).hQIm).qRe.polarBilin x y : ℝ) : ℂ) +
+    (((RiemannThetaAble hg
+        ((2:ℝ) • ((Sp2gR.Tmatrix B hB) • old_tau_half).Q_Re)
+        ((2:ℝ) • ((Sp2gR.Tmatrix B hB) • old_tau_half).Q_Im)
+        (((Sp2gR.Tmatrix B hB) • old_tau_half).hQIm_cont.const_smul (2:ℝ))
+        (((Sp2gR.Tmatrix B hB) • old_tau_half).hQIm.smul (by norm_num))).qRe.polarBilin x y : ℝ) : ℂ) +
         Complex.I *
-          (((RiemannThetaAble hg ((Sp2gR.Tmatrix B hB) • old_tau).Q_Re
-            ((Sp2gR.Tmatrix B hB) • old_tau).Q_Im
-            ((Sp2gR.Tmatrix B hB) • old_tau).hQIm_cont
-            ((Sp2gR.Tmatrix B hB) • old_tau).hQIm).qIm.polarBilin x y : ℝ) : ℂ) =
+          (((RiemannThetaAble hg
+              ((2:ℝ) • ((Sp2gR.Tmatrix B hB) • old_tau_half).Q_Re)
+              ((2:ℝ) • ((Sp2gR.Tmatrix B hB) • old_tau_half).Q_Im)
+              (((Sp2gR.Tmatrix B hB) • old_tau_half).hQIm_cont.const_smul (2:ℝ))
+              (((Sp2gR.Tmatrix B hB) • old_tau_half).hQIm.smul (by norm_num))).qIm.polarBilin x y
+            : ℝ) : ℂ) =
       (old_thetaable.qRe.polarBilin x y : ℂ) +
         Complex.I * (old_thetaable.qIm.polarBilin x y : ℂ) +
-          ∑ i, ∑ j, (algebraMap R ℂ (B i j)) * (x i : ℂ) * (y j : ℂ)
+          2 * ∑ i, ∑ j, (algebraMap R ℂ (B i j)) * (x i : ℂ) * (y j : ℂ)
   have lattice_polar (Q : QuadraticMap ℝ (EuclideanSpace ℝ (Fin g)) ℝ)
       (u v : Fin g → ℤ) :
       (latticeQuadraticMap Q).polarBilin u v =
-        Q.polarBilin (latticeEmbedding (Fin g) u) (latticeEmbedding (Fin g) v) := by
+        Q.polarBilin (toEuclidean_ZnRn u) (toEuclidean_ZnRn v) := by
     rw [QuadraticMap.polarBilin_apply_apply]
-    change Q (latticeEmbedding (Fin g) (u + v)) - Q (latticeEmbedding (Fin g) u) -
-      Q (latticeEmbedding (Fin g) v) = _
+    change Q (toEuclidean_ZnRn (u + v)) - Q (toEuclidean_ZnRn u) -
+      Q (toEuclidean_ZnRn v) = _
     rw [map_add]
     rfl
   change
-    (((latticeQuadraticMap ((Sp2gR.Tmatrix B hB) • old_tau).Q_Re).polarBilin x y : ℝ) : ℂ) +
+    (((latticeQuadraticMap
+        ((2:ℝ) • ((Sp2gR.Tmatrix B hB) • old_tau_half).Q_Re)).polarBilin x y : ℝ) : ℂ) +
       Complex.I *
-        (((latticeQuadraticMap ((Sp2gR.Tmatrix B hB) • old_tau).Q_Im).polarBilin x y : ℝ) : ℂ) =
+        (((latticeQuadraticMap
+            ((2:ℝ) • ((Sp2gR.Tmatrix B hB) • old_tau_half).Q_Im)).polarBilin x y : ℝ) : ℂ) =
       (old_thetaable.qRe.polarBilin x y : ℂ) +
         Complex.I * (old_thetaable.qIm.polarBilin x y : ℂ) +
-          ∑ i, ∑ j, (algebraMap R ℂ (B i j)) * (x i : ℂ) * (y j : ℂ)
+          2 * ∑ i, ∑ j, (algebraMap R ℂ (B i j)) * (x i : ℂ) * (y j : ℂ)
   rw [lattice_polar, lattice_polar]
   set B_quad := quadraticMapOfMatrix B
   have hqm_add : ∀ S T : Matrix (Fin g) (Fin g) ℝ,
@@ -1058,29 +866,46 @@ private lemma tau_operator_Tmatrix
     simp only [Matrix.map_apply, Algebra.algebraMap_self_apply]
   have halg : ∀ r : ℝ, algebraMap ℝ ℂ r = (r : ℂ) := fun r => by
     rw [Algebra.algebraMap_eq_smul_one, Complex.real_smul, mul_one]
-  have b_act_tau_re : (Sp2gR.Tmatrix B hB • old_tau).Q_Re = old_tau.Q_Re + B_quad := by
-    show quadraticMapOfMatrix
-        ((siegelMatrixAction (Sp2gR.Tmatrix B hB) old_tau.toMatrix).map Complex.re)
-      = old_tau.Q_Re + B_quad
+  -- `gramMatrixReal_smul`/`quadraticMapOfMatrix_smul` (`QuadraticFormUtils.lean`) push the outer
+  -- `(2:ℝ) •` through `old_tau_half`'s internal `(2:ℝ)⁻¹ •` so they cancel.
+  have hhalf_toMatrix_re : old_tau_half.toMatrix.map Complex.re
+      = (2:ℝ)⁻¹ • old_tau.toMatrix.map Complex.re := by
+    rw [SiegelUpperHalfSpace.toMatrix_map_re,
+      show old_tau_half.Q_Re = (2:ℝ)⁻¹ • old_tau.Q_Re from rfl, gramMatrixReal_smul,
+      SiegelUpperHalfSpace.toMatrix_map_re]
+  have hhalf_toMatrix_im : old_tau_half.toMatrix.map Complex.im
+      = (2:ℝ)⁻¹ • old_tau.toMatrix.map Complex.im := by
+    rw [SiegelUpperHalfSpace.toMatrix_map_im,
+      show old_tau_half.Q_Im = (2:ℝ)⁻¹ • old_tau.Q_Im from rfl, gramMatrixReal_smul,
+      SiegelUpperHalfSpace.toMatrix_map_im]
+  have b_act_tau_re : (2:ℝ) • (Sp2gR.Tmatrix B hB • old_tau_half).Q_Re
+      = old_tau.Q_Re + (2:ℝ) • B_quad := by
+    show (2:ℝ) • quadraticMapOfMatrix
+        ((siegelMatrixAction (Sp2gR.Tmatrix B hB) old_tau_half.toMatrix).map Complex.re)
+      = old_tau.Q_Re + (2:ℝ) • B_quad
     rw [siegelMatrixAction_Tmatrix]
-    have hsplit : (old_tau.toMatrix + (algebraMap R ℂ).mapMatrix B).map Complex.re
-        = old_tau.toMatrix.map Complex.re + B.map (algebraMap R ℝ) := by
+    have hsplit : (old_tau_half.toMatrix + (algebraMap R ℂ).mapMatrix B).map Complex.re
+        = old_tau_half.toMatrix.map Complex.re + B.map (algebraMap R ℝ) := by
       ext i j
       simp only [Matrix.map_apply, Matrix.add_apply, Complex.add_re, RingHom.mapMatrix_apply,
         IsScalarTower.algebraMap_apply R ℝ ℂ, halg, Complex.ofReal_re]
-    rw [hsplit, hqm_add, SiegelUpperHalfSpace.toMatrix_map_re, quadraticMapOfMatrix_gramMatrixReal,
-      hqm_cast]
-  have b_act_tau_im : (Sp2gR.Tmatrix B hB • old_tau).Q_Im = old_tau.Q_Im := by
-    show quadraticMapOfMatrix
-        ((siegelMatrixAction (Sp2gR.Tmatrix B hB) old_tau.toMatrix).map Complex.im)
+    rw [hsplit, hhalf_toMatrix_re, hqm_add, quadraticMapOfMatrix_smul,
+      SiegelUpperHalfSpace.toMatrix_map_re, quadraticMapOfMatrix_gramMatrixReal, hqm_cast,
+      smul_add, smul_smul]
+    norm_num
+  have b_act_tau_im : (2:ℝ) • (Sp2gR.Tmatrix B hB • old_tau_half).Q_Im = old_tau.Q_Im := by
+    show (2:ℝ) • quadraticMapOfMatrix
+        ((siegelMatrixAction (Sp2gR.Tmatrix B hB) old_tau_half.toMatrix).map Complex.im)
       = old_tau.Q_Im
     rw [siegelMatrixAction_Tmatrix]
-    have hsplit : (old_tau.toMatrix + (algebraMap R ℂ).mapMatrix B).map Complex.im
-        = old_tau.toMatrix.map Complex.im := by
+    have hsplit : (old_tau_half.toMatrix + (algebraMap R ℂ).mapMatrix B).map Complex.im
+        = old_tau_half.toMatrix.map Complex.im := by
       ext i j
       simp only [Matrix.map_apply, Matrix.add_apply, Complex.add_im, RingHom.mapMatrix_apply,
         IsScalarTower.algebraMap_apply R ℝ ℂ, halg, Complex.ofReal_im, add_zero]
-    rw [hsplit, SiegelUpperHalfSpace.toMatrix_map_im, quadraticMapOfMatrix_gramMatrixReal]
+    rw [hsplit, hhalf_toMatrix_im, quadraticMapOfMatrix_smul, SiegelUpperHalfSpace.toMatrix_map_im,
+      quadraticMapOfMatrix_gramMatrixReal, smul_smul]
+    norm_num
   rw [b_act_tau_re, b_act_tau_im]
   have polar_add (Q₁ Q₂ : QuadraticMap ℝ (EuclideanSpace ℝ (Fin g)) ℝ)
       (u v : EuclideanSpace ℝ (Fin g)) :
@@ -1089,28 +914,35 @@ private lemma tau_operator_Tmatrix
     change (Q₁ (u + v) + Q₂ (u + v)) - (Q₁ u + Q₂ u) - (Q₁ v + Q₂ v) =
       (Q₁ (u + v) - Q₁ u - Q₁ v) + (Q₂ (u + v) - Q₂ u - Q₂ v)
     ring
-  rw [polar_add]
+  have polar_smul (c : ℝ) (Q : QuadraticMap ℝ (EuclideanSpace ℝ (Fin g)) ℝ)
+      (u v : EuclideanSpace ℝ (Fin g)) :
+      (c • Q).polarBilin u v = c * Q.polarBilin u v := by
+    rw [QuadraticMap.polarBilin_apply_apply, QuadraticMap.polarBilin_apply_apply]
+    show (c • Q) (u + v) - (c • Q) u - (c • Q) v = c * (Q (u + v) - Q u - Q v)
+    simp only [QuadraticMap.smul_apply, smul_eq_mul]
+    ring
+  rw [polar_add, polar_smul]
   have old_tau_re_restrict : latticeQuadraticMap old_tau.Q_Re = old_thetaable.qRe := by
     apply QuadraticMap.ext
     intro u
-    change old_tau_re (latticeEmbedding (Fin g) u) = old_thetaable.qRe u
+    change old_tau_re (toEuclidean_ZnRn u) = old_thetaable.qRe u
     simpa [old_tau_re] using latticeQuadToEuclidean_restrict old_thetaable.qRe u
   have old_tau_im_restrict : latticeQuadraticMap old_tau.Q_Im = old_thetaable.qIm := by
     apply QuadraticMap.ext
     intro u
-    change old_tau_im (latticeEmbedding (Fin g) u) = old_thetaable.qIm u
+    change old_tau_im (toEuclidean_ZnRn u) = old_thetaable.qIm u
     simpa [old_tau_im] using latticeQuadToEuclidean_restrict old_thetaable.qIm u
-  have hold_re : old_tau.Q_Re.polarBilin (latticeEmbedding (Fin g) x)
-      (latticeEmbedding (Fin g) y) = old_thetaable.qRe.polarBilin x y := by
+  have hold_re : old_tau.Q_Re.polarBilin (toEuclidean_ZnRn x)
+      (toEuclidean_ZnRn y) = old_thetaable.qRe.polarBilin x y := by
     rw [← lattice_polar old_tau.Q_Re x y, old_tau_re_restrict]
-  have hold_im : old_tau.Q_Im.polarBilin (latticeEmbedding (Fin g) x)
-      (latticeEmbedding (Fin g) y) = old_thetaable.qIm.polarBilin x y := by
+  have hold_im : old_tau.Q_Im.polarBilin (toEuclidean_ZnRn x)
+      (toEuclidean_ZnRn y) = old_thetaable.qIm.polarBilin x y := by
     rw [← lattice_polar old_tau.Q_Im x y, old_tau_im_restrict]
   rw [hold_re, hold_im]
   ring_nf
   set term0 := (old_thetaable.qRe.polarBilin x) y
   set term1 := (old_thetaable.qIm.polarBilin x) y
-  set term2 := (B_quad.polarBilin ((latticeEmbedding (Fin g)) x)) ((latticeEmbedding (Fin g)) y)
+  set term2 := (B_quad.polarBilin (toEuclidean_ZnRn x)) (toEuclidean_ZnRn y)
   set term3 := ∑ x_1, ∑ x_2, (algebraMap R ℂ) (B x_1 x_2) * ↑(x x_1) * ↑(y x_2)
   norm_num
   rw [mul_comm Complex.I]
@@ -1132,13 +964,13 @@ private lemma tau_operator_Tmatrix
     rw [hB_quad]
     exact gramMatrixReal_quadraticMapOfMatrix hBreal
   have hpolar := polarBilin_eq_gramMatrixReal_sum B_quad
-    (latticeEmbedding (Fin g) x) (latticeEmbedding (Fin g) y)
+    (toEuclidean_ZnRn x) (toEuclidean_ZnRn y)
   rw [hgram] at hpolar
-  change (B_quad.polarBilin (latticeEmbedding (Fin g) x) (latticeEmbedding (Fin g) y) : ℂ) = _
+  change (B_quad.polarBilin (toEuclidean_ZnRn x) (toEuclidean_ZnRn y) : ℂ) = _
   rw [hpolar]
   have hterm3 : term3 = ∑ i, ∑ j, (algebraMap R ℂ) (B i j) * (x i : ℂ) * (y j : ℂ) := rfl
   rw [hterm3]
-  have hlat : ∀ (z : Fin g → ℤ) (i : Fin g), (latticeEmbedding (Fin g) z).ofLp i = (z i : ℝ) := by
+  have hlat : ∀ (z : Fin g → ℤ) (i : Fin g), (toEuclidean_ZnRn z).ofLp i = (z i : ℝ) := by
     intro z i
     simp [latticeEmbedding, pre_latticeEmbedding]
   simp only [hlat]
@@ -1158,7 +990,7 @@ private lemma theta_summand_after_Tanalog
   : theta_summand_after g hg (x_summand := x_summand) (M:=Sp2gR.Tmatrix B hB) (old_thetaable:=old_thetaable) (z:=z) =
     Complex.exp (↑Real.pi * Complex.I *
       ((old_thetaable.qRe x_summand +
-          (2 : ℝ)⁻¹ * ∑ i, ∑ j,
+          ∑ i, ∑ j,
             (algebraMap R ℝ (B i j)) * (x_summand i : ℝ) * (x_summand j : ℝ) : ℝ) +
         Complex.I * (old_thetaable.qIm x_summand : ℂ)) +
       2 * ↑Real.pi * Complex.I * (z x_summand)) := by
@@ -1206,12 +1038,12 @@ private lemma theta_summand_after_Tanalog
     ring
   have hold_quadratic_with_B :
       ((old_thetaable.qRe x_summand +
-          (2 : ℝ)⁻¹ * ∑ i, ∑ j,
+          ∑ i, ∑ j,
             (algebraMap R ℝ (B i j)) * (x_summand i : ℝ) * (x_summand j : ℝ) : ℝ) : ℂ) +
           Complex.I * (old_thetaable.qIm x_summand : ℂ) =
         (2 : ℂ)⁻¹ *
           (tau_operator (R := ℤ) (thetaable := old_thetaable) x_summand) x_summand +
-            ((2 : ℝ)⁻¹ * ∑ i, ∑ j,
+            (∑ i, ∑ j,
               (algebraMap R ℝ (B i j)) * (x_summand i : ℝ) * (x_summand j : ℝ) : ℝ) := by
     push_cast
     linear_combination hold_quadratic
@@ -1226,16 +1058,14 @@ private lemma theta_summand_after_Tanalog
       ↑Real.pi * Complex.I *
         ((2 : ℂ)⁻¹ *
             (tau_operator (R := ℤ) (thetaable := old_thetaable) x_summand) x_summand +
-          ((2 : ℝ)⁻¹ * ∑ i, ∑ j,
+          (∑ i, ∑ j,
             (algebraMap R ℝ (B i j)) * (x_summand i : ℝ) * (x_summand j : ℝ) : ℝ))
   rw [← hthetaable]
   rw [tau_operator_Tmatrix]
   simp
   ring_nf
   rw [add_left_cancel_iff]
-  rw [mul_comm _ (1/2)]
   simp_rw [IsScalarTower.algebraMap_apply R ℝ ℂ]
-  rw [mul_comm _ (1/2)]
   congr 1
 
 /-- The sum of a symmetric, zero-on-the-diagonal `Fin g`-indexed integer array is even: pairing
@@ -1263,32 +1093,6 @@ private lemma even_sum_sum_of_symm_zero_diag {g : ℕ} (f : Fin g → Fin g → 
     rw [hexpand]
     exact (even_two_mul _).add ih
 
-/-- The linear shift `(1/4) • diag(B) · x` (as a `ℂ`-valued functional on `Fin g → ℤ`), built from
-the diagonal of an integer symmetric matrix `B`. The coefficient `1/4`, not `1/2`, is what the
-computation actually needs: `theta_fun`'s exponent uses `Q(x) := qRe(x)`, and `qRe`'s own
-`(1/2)xᵀΩx` relation to its Gram matrix `Ω` (via `Q.polarBilin(x,x) = 2Q(x)`) already accounts for
-one factor of `1/2`. Writing the (fully even, `hBeven`) `B = 2C`, the exponent correction
-`exp(πI·(1/2)xᵀBx) = exp(πI·xᵀCx)`, and `xᵢ² ≡ xᵢ (mod 2)` reduces `xᵀCx`'s diagonal part to
-`∑Cᵢᵢxᵢ = ∑(Bᵢᵢ/2)xᵢ`, giving `exp(πI·∑Cᵢᵢxᵢ) = exp(2πI·(1/4)·diag(B)·x)` — the second `1/2`,
-compounding with the first, is where the `1/4` comes from. -/
-noncomputable def diagShift (B : Matrix (Fin g) (Fin g) ℤ) : (Fin g → ℤ) →ₗ[ℤ] ℂ :=
-  (4 : ℂ)⁻¹ • ThetaAbleQuadraticForm.HomMRC_inc (R := ℤ) (M := Fin g → ℤ)
-    (∑ i, (B i i) • (LinearMap.proj i : (Fin g → ℤ) →ₗ[ℤ] ℤ))
-
-/-- `diagShift` is additive in `B`: `diagShift (B₁ + B₂) = diagShift B₁ + diagShift B₂`. Combined
-with `Sp2gR.Tmatrix_mul` (`Tmatrix B₁ * Tmatrix B₂ = Tmatrix (B₁ + B₂)`), this is the consistency
-check that the subgroup of even-symmetric-integer-matrix T-shifts acts on theta series compatibly
-with its own multiplication law: shifting by `Tmatrix B₁` then `Tmatrix B₂` composes the same way
-`B₁` and `B₂` themselves compose (by addition). -/
-lemma diagShift_add (B₁ B₂ : Matrix (Fin g) (Fin g) ℤ) :
-    diagShift (B₁ + B₂) = diagShift B₁ + diagShift B₂ := by
-  unfold diagShift
-  rw [← smul_add, ← map_add]
-  congr 2
-  rw [← Finset.sum_add_distrib]
-  refine Finset.sum_congr rfl fun i _ => ?_
-  rw [Matrix.add_apply, add_smul]
-
 private lemma theta_summand_after_zero
     (g : ℕ) (hg : g ≠ 0) (x : Fin g → ℤ)
     (old_thetaable : ThetaAbleQuadraticForm (R := ℤ) (M := Fin g → ℤ))
@@ -1303,34 +1107,30 @@ private lemma theta_summand_after_zero
     (0 : Matrix (Fin g) (Fin g) ℤ) Matrix.transpose_zero z]
   norm_num
 
-/-- The theta transformation law for the integral T-shift `M := Sp2gR.Tmatrix B hB`
-(`B : Matrix (Fin g) (Fin g) ℤ`, every entry even), phrased at the level of `theta_summand_after`:
-the `x`-summand of `θ(z; M • old_thetaable)` agrees with the `x`-summand of `θ(z + diagShift B;
-old_thetaable)` — the latter written as `theta_summand_after` at the *trivial* shift `B = 0`
-(`theta_summand_after_zero` identifies this with the raw `old_thetaable` summand). Summing this
-term-by-term identity over `x` gives the full `theta_fun` transformation law. -/
-theorem theta_summand_after_Tmatrix_diagShift
+/-- The theta transformation law for the integral T-shift `M := Sp2gR.Tmatrix B hB`, for `B` with
+*even diagonal* only (off-diagonal entries unconstrained): `θ(z; M • old_thetaable) = θ(z;
+old_thetaable)`, no shift needed. `theta_fun`'s exponent uses `Q(x) := qRe(x)`, and after
+`RiemannThetaAble_siegelSMul`'s convention fix `qRe` carries the *full* (not Gram-halved)
+`B`-contribution `∑∑Bᵢⱼxᵢxⱼ`. This splits into an off-diagonal part that is always even (pairing
+`(i,j)` with `(j,i)`, `B` symmetric) and a diagonal part `∑Bᵢᵢxᵢ²` that is even whenever each `Bᵢᵢ`
+is, so `exp(πI·∑∑Bᵢⱼxᵢxⱼ) = 1` and the two summands agree exactly, at the same `z`. -/
+theorem theta_summand_after_Tmatrix_diagEven
     (g : ℕ) (hg : g ≠ 0) (x : Fin g → ℤ)
     (old_thetaable : ThetaAbleQuadraticForm (R := ℤ) (M := Fin g → ℤ))
-    (B : Matrix (Fin g) (Fin g) ℤ) (hB : B.IsSymm) (hBeven : ∀ i j, Even (B i j))
+    (B : Matrix (Fin g) (Fin g) ℤ) (hB : B.IsSymm) (hBdiag : ∀ i, Even (B i i))
     (z : (Fin g → ℤ) →ₗ[ℤ] ℂ) :
     theta_summand_after g hg (x_summand := x) (M := Sp2gR.Tmatrix B hB)
         (old_thetaable := old_thetaable) (z := z) =
       theta_summand_after g hg (x_summand := x)
         (M := Sp2gR.Tmatrix (0 : Matrix (Fin g) (Fin g) ℤ) Matrix.transpose_zero)
-        (old_thetaable := old_thetaable) (z := z + diagShift B) := by
+        (old_thetaable := old_thetaable) (z := z) := by
   rw [theta_summand_after_Tanalog (R := ℤ) g hg x old_thetaable B hB z, theta_summand_after_zero]
   have hBsymm : ∀ i j, B i j = B j i := by
     intro i j
     have h := congrFun (congrFun hB i) j
     rw [Matrix.transpose_apply] at h
     exact h.symm
-  choose C hC using hBeven
-  have hCsymm : ∀ i j, C i j = C j i := by
-    intro i j
-    have h1 : C i j + C i j = C j i + C j i := by rw [← hC i j, ← hC j i, hBsymm i j]
-    omega
-  set f : Fin g → Fin g → ℤ := fun i j => if i = j then 0 else C i j * x i * x j with hf
+  set f : Fin g → Fin g → ℤ := fun i j => if i = j then 0 else B i j * x i * x j with hf
   have hfsymm : ∀ i j, f i j = f j i := by
     intro i j
     simp only [hf]
@@ -1338,12 +1138,12 @@ theorem theta_summand_after_Tmatrix_diagShift
     · rfl
     · exact absurd h1.symm h2
     · exact absurd h2.symm h1
-    · rw [hCsymm i j]; ring
+    · rw [hBsymm i j]; ring
   have hfdiag : ∀ i, f i i = 0 := fun i => by simp [hf]
   have hfeven := even_sum_sum_of_symm_zero_diag f hfsymm hfdiag
-  have hfsum : ∀ i, ∑ j, f i j = (∑ j, C i j * x i * x j) - C i i * x i * x i := by
+  have hfsum : ∀ i, ∑ j, f i j = (∑ j, B i j * x i * x j) - B i i * x i * x i := by
     intro i
-    have hpointwise : ∀ j, f i j = C i j * x i * x j - (if i = j then C i j * x i * x j else 0) := by
+    have hpointwise : ∀ j, f i j = B i j * x i * x j - (if i = j then B i j * x i * x j else 0) := by
       intro j
       simp only [hf]
       split_ifs <;> ring
@@ -1353,105 +1153,68 @@ theorem theta_summand_after_Tmatrix_diagShift
     rw [Finset.sum_eq_single i (fun b _ hb => by simp [Ne.symm hb])
       (fun h => absurd (Finset.mem_univ i) h)]
     simp
-  have hCCsum : ∑ i, ∑ j, f i j
-      = (∑ i, ∑ j, C i j * x i * x j) - ∑ i, C i i * x i * x i := by
+  have hSSsum : ∑ i, ∑ j, f i j
+      = (∑ i, ∑ j, B i j * x i * x j) - ∑ i, B i i * x i * x i := by
     simp_rw [hfsum]
     rw [Finset.sum_sub_distrib]
-  rw [hCCsum] at hfeven
-  have hdiagEven : Even (∑ i, C i i * x i * x i - ∑ i, C i i * x i) := by
-    rw [← Finset.sum_sub_distrib, even_iff_two_dvd]
+  rw [hSSsum] at hfeven
+  have hdiagEven : Even (∑ i, B i i * x i * x i) := by
+    rw [even_iff_two_dvd]
     apply Finset.dvd_sum
     intro i _
-    have heq : C i i * x i * x i - C i i * x i = C i i * (x i * (x i - 1)) := by ring
-    rw [heq]
-    have hev : Even (x i * (x i - 1)) := by
-      have h := Int.even_mul_succ_self (x i - 1)
-      have heq : (x i - 1) * (x i - 1 + 1) = x i * (x i - 1) := by ring
-      rwa [heq] at h
-    rw [even_iff_two_dvd] at hev
-    exact hev.mul_left (C i i)
-  have hCsum_final : Even ((∑ i, ∑ j, C i j * x i * x j) - ∑ i, C i i * x i) := by
+    rw [← even_iff_two_dvd]
+    exact ((hBdiag i).mul_right (x i)).mul_right (x i)
+  have hSeven : Even (∑ i, ∑ j, B i j * x i * x j) := by
     have hsum := hfeven.add hdiagEven
-    have heq : ((∑ i, ∑ j, C i j * x i * x j) - ∑ i, C i i * x i * x i) +
-        (∑ i, C i i * x i * x i - ∑ i, C i i * x i) =
-        (∑ i, ∑ j, C i j * x i * x j) - ∑ i, C i i * x i := by ring
+    have heq : ((∑ i, ∑ j, B i j * x i * x j) - ∑ i, B i i * x i * x i) +
+        ∑ i, B i i * x i * x i = ∑ i, ∑ j, B i j * x i * x j := by ring
     rwa [heq] at hsum
-  obtain ⟨K, hK⟩ := hCsum_final
-  have hCCsum_eq : (∑ i, ∑ j, C i j * x i * x j : ℤ) = ∑ i, C i i * x i + (K + K) := by
-    have := hK
-    linarith [this]
+  obtain ⟨K, hK⟩ := hSeven
+  conv_lhs =>
+    rw [mul_add]
+    enter [1]
+    norm_num
+    rw [mul_add (↑Real.pi * Complex.I)]
+  conv_rhs =>
+    rw [mul_add]
+  set term0 := ↑Real.pi * Complex.I * (old_thetaable.qRe x : ℂ)
+  set term1 : ℂ := ↑Real.pi * Complex.I * ∑ x_1, ∑ x_2, (B x_1 x_2 : ℂ) * (x x_1 : ℂ) * (x x_2 : ℂ)
+  set term2 := ↑Real.pi * Complex.I * (Complex.I * old_thetaable.qIm x : ℂ)
+  set term3 := 2 * ↑Real.pi * Complex.I * z x
   rw [Complex.exp_eq_exp_iff_exists_int]
   refine ⟨K, ?_⟩
-  have hSeq : ∑ i, ∑ j, (algebraMap ℤ ℝ (B i j)) * (x i : ℝ) * (x j : ℝ)
-      = (2 : ℝ) * ((∑ i, C i i * x i : ℤ) + (K + K) : ℤ) := by
-    have halgint : ∀ n : ℤ, algebraMap ℤ ℝ n = (n : ℝ) := fun n => by simp
-    have hBCC : ∀ i j, (algebraMap ℤ ℝ (B i j) : ℝ) = ((C i j : ℝ) + (C i j : ℝ)) := by
-      intro i j
-      rw [halgint, hC i j]
-      push_cast
-      ring
-    simp_rw [hBCC]
-    push_cast
-    rw [show (∑ i : Fin g, ∑ j : Fin g, ((C i j : ℝ) + C i j) * (x i : ℝ) * (x j : ℝ))
-          = 2 * ∑ i, ∑ j, (C i j : ℝ) * (x i : ℝ) * (x j : ℝ) from by
-        rw [Finset.mul_sum]
-        refine Finset.sum_congr rfl fun i _ => ?_
-        rw [Finset.mul_sum]
-        refine Finset.sum_congr rfl fun j _ => ?_
-        ring]
-    congr 1
-    have : (∑ i : Fin g, ∑ j : Fin g, (C i j : ℝ) * (x i : ℝ) * (x j : ℝ))
-        = ((∑ i, ∑ j, C i j * x i * x j : ℤ) : ℝ) := by push_cast; ring_nf
-    rw [this, hCCsum_eq]
-    push_cast
-    ring
-  have hdiagShiftEq : (2 : ℂ) * diagShift B x = ((∑ i, C i i * x i : ℤ) : ℂ) := by
-    show (2 : ℂ) * ((4 : ℂ)⁻¹ * ThetaAbleQuadraticForm.HomMRC_inc (R := ℤ) (M := Fin g → ℤ)
-      (∑ i, (B i i) • (LinearMap.proj i : (Fin g → ℤ) →ₗ[ℤ] ℤ)) x) = _
-    have hunfold : ThetaAbleQuadraticForm.HomMRC_inc (R := ℤ) (M := Fin g → ℤ)
-        (∑ i, (B i i) • (LinearMap.proj i : (Fin g → ℤ) →ₗ[ℤ] ℤ)) x
-        = ((∑ i, B i i * x i : ℤ) : ℂ) := by
-      simp [ThetaAbleQuadraticForm.HomMRC_inc, LinearMap.toSpanSingleton, LinearMap.proj]
-    rw [hunfold]
-    have hBC : (∑ i, B i i * x i : ℤ) = 2 * ∑ i, C i i * x i := by
-      simp_rw [hC]
-      rw [Finset.mul_sum]
-      refine Finset.sum_congr rfl fun i _ => ?_
-      ring
-    rw [hBC]
-    push_cast
-    ring
-  have hSeqC : ((∑ i, ∑ j, (algebraMap ℤ ℝ (B i j)) * (x i : ℝ) * (x j : ℝ) : ℝ) : ℂ)
-      = 2 * (((∑ i, C i i * x i : ℤ) + (K + K) : ℤ) : ℂ) := by exact_mod_cast hSeq
-  rw [LinearMap.add_apply]
-  linear_combination (norm := (push_cast; ring1))
-    (↑Real.pi * Complex.I * (2 : ℂ)⁻¹) * hSeqC + (-(↑Real.pi * Complex.I)) * hdiagShiftEq
+  have hterm1 : term1 = ↑Real.pi * Complex.I * ((K + K : ℤ) : ℂ) := by
+    show ↑Real.pi * Complex.I * ∑ x_1, ∑ x_2, (B x_1 x_2 : ℂ) * (x x_1 : ℂ) * (x x_2 : ℂ) = _
+    rw [show (∑ x_1 : Fin g, ∑ x_2 : Fin g, (B x_1 x_2 : ℂ) * (x x_1 : ℂ) * (x x_2 : ℂ))
+        = ((∑ i, ∑ j, B i j * x i * x j : ℤ) : ℂ) by push_cast; ring_nf, hK]
+  rw [hterm1]
+  push_cast
+  ring
 
-/-- The theta transformation law for the integral T-shift `M := Sp2gR.Tmatrix B hB`
-(`B : Matrix (Fin g) (Fin g) ℤ`, every entry even): `θ(z; M • old_thetaable) = θ(z + diagShift B;
-old_thetaable)`. The series-level statement, obtained by summing `theta_summand_after_Tmatrix_
-diagShift` (see there for why full-matrix evenness is needed and where `diagShift`'s `1/4`
-coefficient comes from) over `x` via `tsum_congr`. -/
-theorem theta_fun_after_Tmatrix_diagShift
+/-- The theta transformation law for the integral T-shift `M := Sp2gR.Tmatrix B hB`, for `B` with
+even diagonal (`hBdiag`): `θ(z; M • old_thetaable) = θ(z; old_thetaable)`, no shift needed. The
+series-level statement, obtained by summing `theta_summand_after_Tmatrix_diagEven` (see there for
+why only the diagonal needs to be even) over `x` via `tsum_congr`. -/
+theorem theta_fun_after_Tmatrix_diagEven
     (g : ℕ) (hg : g ≠ 0)
     (old_thetaable : ThetaAbleQuadraticForm (R := ℤ) (M := Fin g → ℤ))
-    (B : Matrix (Fin g) (Fin g) ℤ) (hB : B.IsSymm) (hBeven : ∀ i j, Even (B i j))
+    (B : Matrix (Fin g) (Fin g) ℤ) (hB : B.IsSymm) (hBdiag : ∀ i, Even (B i i))
     (z : (Fin g → ℤ) →ₗ[ℤ] ℂ) :
     ThetaAbleQuadraticForm.theta_fun (R := ℤ)
       (thetaable := RiemannThetaAble_siegelSMul (R := ℤ) hg (Sp2gR.Tmatrix B hB) old_thetaable) z =
-    ThetaAbleQuadraticForm.theta_fun (R := ℤ) (thetaable := old_thetaable) (z + diagShift B) := by
+    ThetaAbleQuadraticForm.theta_fun (R := ℤ) (thetaable := old_thetaable) z := by
   have hL : ThetaAbleQuadraticForm.theta_fun (R := ℤ)
       (thetaable := RiemannThetaAble_siegelSMul (R := ℤ) hg (Sp2gR.Tmatrix B hB) old_thetaable) z
       = ∑' x, theta_summand_after g hg (x_summand := x) (M := Sp2gR.Tmatrix B hB)
           (old_thetaable := old_thetaable) (z := z) := rfl
-  have hR : ThetaAbleQuadraticForm.theta_fun (R := ℤ) (thetaable := old_thetaable) (z + diagShift B)
+  have hR : ThetaAbleQuadraticForm.theta_fun (R := ℤ) (thetaable := old_thetaable) z
       = ∑' x, theta_summand_after g hg (x_summand := x)
           (M := Sp2gR.Tmatrix (0 : Matrix (Fin g) (Fin g) ℤ) Matrix.transpose_zero)
-          (old_thetaable := old_thetaable) (z := z + diagShift B) :=
-    tsum_congr fun x => (theta_summand_after_zero g hg x old_thetaable (z + diagShift B)).symm
+          (old_thetaable := old_thetaable) (z := z) :=
+    tsum_congr fun x => (theta_summand_after_zero g hg x old_thetaable z).symm
   rw [hL, hR]
   exact tsum_congr fun x =>
-    theta_summand_after_Tmatrix_diagShift g hg x old_thetaable B hB hBeven z
+    theta_summand_after_Tmatrix_diagEven g hg x old_thetaable B hB hBdiag z
 
 end ThetaTransformTMatrix
 
@@ -1518,32 +1281,90 @@ private lemma qReIm_RiemannThetaAble_siegelSMul_GLmatrix
   have old_tau_im_posdef : old_tau_im.PosDef := by
     apply old_thetaable.qImRe_posdef old_tau_im
     intro u
-    change old_tau_im (latticeEmbedding (Fin g) u) = old_thetaable.qIm u
+    change old_tau_im (toEuclidean_ZnRn u) = old_thetaable.qIm u
     simpa [old_tau_im] using latticeQuadToEuclidean_restrict old_thetaable.qIm u
   let old_tau : SiegelUpperHalfSpace g :=
     ⟨old_tau_re, old_tau_im, by
       simpa [old_tau_im] using latticeQuadToEuclidean_continuous old_thetaable.qIm,
       old_tau_im_posdef⟩
+  have old_tau_half_cont : Continuous ((2:ℝ)⁻¹ • old_tau_im) :=
+    (by simpa [old_tau_im] using latticeQuadToEuclidean_continuous old_thetaable.qIm :
+      Continuous old_tau_im).const_smul (2:ℝ)⁻¹
+  have old_tau_half_posdef : ((2:ℝ)⁻¹ • old_tau_im).PosDef := old_tau_im_posdef.smul (by norm_num)
+  let old_tau_half : SiegelUpperHalfSpace g :=
+    ⟨(2:ℝ)⁻¹ • old_tau_re, (2:ℝ)⁻¹ • old_tau_im, old_tau_half_cont, old_tau_half_posdef⟩
+  -- bridge: `RiemannThetaAble_siegelSMul` builds `τ` from `old_thetaable`'s `qRe/qIm` *halved*,
+  -- then *doubles* the transformed output. Since the GL congruence action `Z ↦ AZAᵀ` is linear in
+  -- `Z`, this halving/doubling commutes straight through it (no extra factor, unlike `T`'s shift).
+  have hhalf_toMatrix_re : old_tau_half.toMatrix.map Complex.re
+      = (2:ℝ)⁻¹ • old_tau.toMatrix.map Complex.re := by
+    rw [SiegelUpperHalfSpace.toMatrix_map_re,
+      show old_tau_half.Q_Re = (2:ℝ)⁻¹ • old_tau.Q_Re from rfl, gramMatrixReal_smul,
+      SiegelUpperHalfSpace.toMatrix_map_re]
+  have hhalf_toMatrix_im : old_tau_half.toMatrix.map Complex.im
+      = (2:ℝ)⁻¹ • old_tau.toMatrix.map Complex.im := by
+    rw [SiegelUpperHalfSpace.toMatrix_map_im,
+      show old_tau_half.Q_Im = (2:ℝ)⁻¹ • old_tau.Q_Im from rfl, gramMatrixReal_smul,
+      SiegelUpperHalfSpace.toMatrix_map_im]
+  have hhalf_toMatrix : old_tau_half.toMatrix = (2:ℂ)⁻¹ • old_tau.toMatrix := by
+    ext i j
+    have hre := congrFun (congrFun hhalf_toMatrix_re i) j
+    have him := congrFun (congrFun hhalf_toMatrix_im i) j
+    simp only [Matrix.map_apply, Matrix.smul_apply, smul_eq_mul] at hre him
+    apply Complex.ext
+    · simpa using hre
+    · simpa using him
+  have hRe_smul : ∀ W : Matrix (Fin g) (Fin g) ℂ,
+      ((2:ℂ)⁻¹ • W).map Complex.re = (2:ℝ)⁻¹ • (W.map Complex.re) := by
+    intro W
+    ext i j
+    show ((2:ℂ)⁻¹ * W i j).re = (2:ℝ)⁻¹ * (W i j).re
+    rw [show (2:ℂ)⁻¹ = ((2:ℝ)⁻¹ : ℝ) by norm_num, Complex.re_ofReal_mul]
+  have hIm_smul : ∀ W : Matrix (Fin g) (Fin g) ℂ,
+      ((2:ℂ)⁻¹ • W).map Complex.im = (2:ℝ)⁻¹ • (W.map Complex.im) := by
+    intro W
+    ext i j
+    show ((2:ℂ)⁻¹ * W i j).im = (2:ℝ)⁻¹ * (W i j).im
+    rw [show (2:ℂ)⁻¹ = ((2:ℝ)⁻¹ : ℝ) by norm_num, Complex.im_ofReal_mul]
+  have bRe : (2:ℝ) • ((Sp2gR.GLmatrix U hU) • old_tau_half).Q_Re
+      = ((Sp2gR.GLmatrix U hU) • old_tau).Q_Re := by
+    show (2:ℝ) • quadraticMapOfMatrix
+        ((siegelMatrixAction (Sp2gR.GLmatrix U hU) old_tau_half.toMatrix).map Complex.re)
+      = quadraticMapOfMatrix
+        ((siegelMatrixAction (Sp2gR.GLmatrix U hU) old_tau.toMatrix).map Complex.re)
+    rw [hhalf_toMatrix, siegelMatrixAction_GLmatrix, siegelMatrixAction_GLmatrix,
+      mul_smul_comm, smul_mul_assoc, hRe_smul, quadraticMapOfMatrix_smul, smul_smul]
+    norm_num
+  have bIm : (2:ℝ) • ((Sp2gR.GLmatrix U hU) • old_tau_half).Q_Im
+      = ((Sp2gR.GLmatrix U hU) • old_tau).Q_Im := by
+    show (2:ℝ) • quadraticMapOfMatrix
+        ((siegelMatrixAction (Sp2gR.GLmatrix U hU) old_tau_half.toMatrix).map Complex.im)
+      = quadraticMapOfMatrix
+        ((siegelMatrixAction (Sp2gR.GLmatrix U hU) old_tau.toMatrix).map Complex.im)
+    rw [hhalf_toMatrix, siegelMatrixAction_GLmatrix, siegelMatrixAction_GLmatrix,
+      mul_smul_comm, smul_mul_assoc, hIm_smul, quadraticMapOfMatrix_smul, smul_smul]
+    norm_num
   have hGLmatrix : ((Sp2gR.GLmatrix U hU) • old_tau).toMatrix =
       (algebraMap ℤ ℂ).mapMatrix U * old_tau.toMatrix *
         ((algebraMap ℤ ℂ).mapMatrix U).transpose := by
     change (siegelSMul (Sp2gR.GLmatrix U hU) old_tau).toMatrix = _
     rw [siegelSMul_toMatrix, siegelMatrixAction_GLmatrix]
   change
-    (((latticeQuadraticMap ((Sp2gR.GLmatrix U hU) • old_tau).Q_Re) x : ℝ) : ℂ) +
+    (((latticeQuadraticMap ((2:ℝ) • ((Sp2gR.GLmatrix U hU) • old_tau_half).Q_Re)) x : ℝ) : ℂ) +
       Complex.I *
-        (((latticeQuadraticMap ((Sp2gR.GLmatrix U hU) • old_tau).Q_Im) x : ℝ) : ℂ) =
+        (((latticeQuadraticMap ((2:ℝ) • ((Sp2gR.GLmatrix U hU) • old_tau_half).Q_Im)) x : ℝ) : ℂ) =
       (old_thetaable.qRe (GLmatrix_reindex U x) : ℂ) +
         Complex.I * (old_thetaable.qIm (GLmatrix_reindex U x) : ℂ)
+  rw [bRe, bIm]
   have old_tau_re_restrict : latticeQuadraticMap old_tau.Q_Re = old_thetaable.qRe := by
     apply QuadraticMap.ext
     intro u
-    change old_tau_re (latticeEmbedding (Fin g) u) = old_thetaable.qRe u
+    change old_tau_re (toEuclidean_ZnRn u) = old_thetaable.qRe u
     simpa [old_tau_re] using latticeQuadToEuclidean_restrict old_thetaable.qRe u
   have old_tau_im_restrict : latticeQuadraticMap old_tau.Q_Im = old_thetaable.qIm := by
     apply QuadraticMap.ext
     intro u
-    change old_tau_im (latticeEmbedding (Fin g) u) = old_thetaable.qIm u
+    change old_tau_im (toEuclidean_ZnRn u) = old_thetaable.qIm u
     simpa [old_tau_im] using latticeQuadToEuclidean_restrict old_thetaable.qIm u
   rw [← old_tau_re_restrict, ← old_tau_im_restrict]
   simp_rw [latticeQuadraticMap_apply]
@@ -1551,7 +1372,7 @@ private lemma qReIm_RiemannThetaAble_siegelSMul_GLmatrix
     SiegelUpperHalfSpace.complex_quadratic old_tau]
   rw [hGLmatrix]
   have hlat : ∀ (z : Fin g → ℤ) (i : Fin g),
-      (latticeEmbedding (Fin g) z).ofLp i = (z i : ℝ) := by
+      (toEuclidean_ZnRn z).ofLp i = (z i : ℝ) := by
     intro z i
     simp [latticeEmbedding, pre_latticeEmbedding]
   simp only [hlat]
@@ -1682,35 +1503,18 @@ section ThetaTransformSMatrix
 
 /-! ### The target `theta_fun` identity under `S_g` (Poisson resummation)
 
-`x_summand_quadratic_after_Smatrix`/`theta_summand_after_Smatrix` above compute only the
+`x_summand_quadratic_after_Smatrix`/`theta_summand_after_Smatrix` below compute only the
 *summand*-level content of the `S_g` transformation (term `n` of the exponent, rewritten in terms
 of the new modulus `-τ⁻¹`) — genuinely relating the two full series `θ(·; τ)` and `θ(·; -τ⁻¹)`
 needs an actual Poisson resummation, since (unlike the `T`/`GL` generators) the terms do not match
-up termwise. Given the `g`-fold generalization of Mathlib's `Complex.tsum_exp_neg_quadratic`
-(`Mathlib.Analysis.SpecialFunctions.Gaussian.PoissonSummation`), i.e.
+up termwise. The rank-`g` Poisson summation identity needed for this is
+`tsum_exp_neg_quadratic_matrix` (`PoissonSummation.lean`):
 
 `∑' (n : Fin g → ℤ), exp (-π * ∑ i, ∑ j, A i j * n i * n j + 2 * π * ∑ i, b i * n i) =
-  1 / (Matrix.det A) ^ (1/2 : ℂ) *
+  1 / pivotSqrt g A *
     ∑' (n : Fin g → ℤ), exp (-π * ∑ i, ∑ j, A⁻¹ i j * (n i + I * b i) * (n j + I * b j))`
 
-for `A : Matrix (Fin g) (Fin g) ℂ` symmetric with `Re A` positive definite and `b : Fin g → ℂ`,
-applied with `A := -I • τ.toMatrix` (so `Re A = gramMatrixReal τ.Q_Im`, positive definite by `τ`'s
-own defining hypothesis) and `b := I • w`, where `w i := z (Pi.single i 1)` recovers `z` from its
-values on the standard basis (`z n = ∑ i, w i * n i` by `ℤ`-linearity) — completing the square with
-`M := siegelMatrixAction (Sp2gR.Smatrix (R := ℤ) (g := g)) τ.toMatrix = -τ.toMatrix⁻¹`
-(`siegelMatrixAction_Smatrix`) — gives the genus-`g` theta transformation law:
-
-`theta_fun old_thetaable z =
-  1 / ((-I) ^ g * τ.toMatrix.det) ^ (1/2 : ℂ) *
-    Complex.exp (-π * I * ∑ i, ∑ j, τ.toMatrix⁻¹ i j * w i * w j) *
-    theta_fun (RiemannThetaAble_siegelSMul hg (Sp2gR.Smatrix (R := ℤ) (g := g)) old_thetaable) z'`
-
-where `τ` is the `SiegelUpperHalfSpace` reconstructed from `old_thetaable` (as in
-`theta_summand_after_Smatrix`'s `old_tau`) and `z' : (Fin g → ℤ) →ₗ[ℤ] ℂ` is
-`z' n = ∑ i, ∑ j, τ.toMatrix⁻¹ i j * w j * n i` (i.e. `z' = τ⁻¹ w`, read back as a linear functional
-on `ℤ^g`). This is *not* a corollary of the summand-level lemmas below; it needs the rank-`g`
-Poisson summation formula itself, which is not yet available (see `x_summand_quadratic_after_Smatrix`'s
-docstring). -/
+for `A : Matrix (Fin g) (Fin g) ℂ` symmetric with `Re A` positive definite and `b : Fin g → ℂ`. -/
 
 /-- Under the Fourier generator `S_g`, the lattice index is unchanged at the level of the
 transformed quadratic exponent; its modulus matrix becomes `-τ⁻¹`. Summing these terms is the
@@ -1718,13 +1522,13 @@ separate Poisson-resummation step. -/
 private lemma x_summand_quadratic_after_Smatrix
     (τ : SiegelUpperHalfSpace g) (x_summand : Fin g → ℤ) :
     ((siegelSMul (Sp2gR.Smatrix (R := R) (g := g)) τ).Q_Re
-        (latticeEmbedding (Fin g) x_summand) : ℂ) +
+        (toEuclidean_ZnRn x_summand) : ℂ) +
       Complex.I *
         ((siegelSMul (Sp2gR.Smatrix (R := R) (g := g)) τ).Q_Im
-          (latticeEmbedding (Fin g) x_summand) : ℂ) =
+          (toEuclidean_ZnRn x_summand) : ℂ) =
       -(2 : ℂ)⁻¹ * ∑ i, ∑ j, τ.toMatrix⁻¹ i j *
-        ((latticeEmbedding (Fin g) x_summand) i : ℂ) *
-        ((latticeEmbedding (Fin g) x_summand) j : ℂ) := by
+        ((toEuclidean_ZnRn x_summand) i : ℂ) *
+        ((toEuclidean_ZnRn x_summand) j : ℂ) := by
   rw [SiegelUpperHalfSpace.complex_quadratic, siegelSMul_toMatrix,
     siegelMatrixAction_Smatrix]
   conv_lhs => rw [Finset.mul_sum]
@@ -1735,8 +1539,8 @@ private lemma x_summand_quadratic_after_Smatrix
   conv_rhs => rw [Finset.mul_sum]
   congr 1
   ext j
-  set i_Vec := (((latticeEmbedding (Fin g)) x_summand).ofLp i)
-  set j_Vec := (((latticeEmbedding (Fin g)) x_summand).ofLp j)
+  set i_Vec := ((toEuclidean_ZnRn x_summand).ofLp i)
+  set j_Vec := ((toEuclidean_ZnRn x_summand).ofLp j)
   ring_nf
   rw [mul_comm _ (i_Vec : ℂ)]
   by_cases hiVec : i_Vec = 0
@@ -1789,7 +1593,7 @@ private lemma theta_summand_after_Smatrix
       (M := Sp2gR.Smatrix (R := ℤ) (g := g))
       (old_thetaable := old_thetaable) (z := z) =
     Complex.exp (↑Real.pi * Complex.I *
-      (-(2 : ℂ)⁻¹ * ∑ i, ∑ j, (thetaableToMatrix old_thetaable)⁻¹ i j *
+      (-(2 : ℂ) * ∑ i, ∑ j, (thetaableToMatrix old_thetaable)⁻¹ i j *
         (x_summand i : ℂ) * (x_summand j : ℂ))
       + 2 * ↑Real.pi * Complex.I * (z x_summand)) := by
   simp only [theta_summand_after]
@@ -1798,7 +1602,150 @@ private lemma theta_summand_after_Smatrix
   have old_tau_im_posdef : old_tau_im.PosDef := by
     apply old_thetaable.qImRe_posdef old_tau_im
     intro u
-    change old_tau_im (latticeEmbedding (Fin g) u) = old_thetaable.qIm u
+    change old_tau_im (toEuclidean_ZnRn u) = old_thetaable.qIm u
+    simpa [old_tau_im] using latticeQuadToEuclidean_restrict old_thetaable.qIm u
+  let old_tau : SiegelUpperHalfSpace g :=
+    ⟨old_tau_re, old_tau_im, by
+      simpa [old_tau_im] using latticeQuadToEuclidean_continuous old_thetaable.qIm,
+      old_tau_im_posdef⟩
+  have old_tau_half_cont : Continuous ((2:ℝ)⁻¹ • old_tau_im) :=
+    (by simpa [old_tau_im] using latticeQuadToEuclidean_continuous old_thetaable.qIm :
+      Continuous old_tau_im).const_smul (2:ℝ)⁻¹
+  have old_tau_half_posdef : ((2:ℝ)⁻¹ • old_tau_im).PosDef := old_tau_im_posdef.smul (by norm_num)
+  let old_tau_half : SiegelUpperHalfSpace g :=
+    ⟨(2:ℝ)⁻¹ • old_tau_re, (2:ℝ)⁻¹ • old_tau_im, old_tau_half_cont, old_tau_half_posdef⟩
+  have hmatrix : thetaableToMatrix old_thetaable = old_tau.toMatrix := rfl
+  rw [hmatrix]
+  -- bridge: `old_tau_half.toMatrix = (2:ℂ)⁻¹ • old_tau.toMatrix`, exactly as for `T`/`GL`.
+  have hhalf_toMatrix_re : old_tau_half.toMatrix.map Complex.re
+      = (2:ℝ)⁻¹ • old_tau.toMatrix.map Complex.re := by
+    rw [SiegelUpperHalfSpace.toMatrix_map_re,
+      show old_tau_half.Q_Re = (2:ℝ)⁻¹ • old_tau.Q_Re from rfl, gramMatrixReal_smul,
+      SiegelUpperHalfSpace.toMatrix_map_re]
+  have hhalf_toMatrix_im : old_tau_half.toMatrix.map Complex.im
+      = (2:ℝ)⁻¹ • old_tau.toMatrix.map Complex.im := by
+    rw [SiegelUpperHalfSpace.toMatrix_map_im,
+      show old_tau_half.Q_Im = (2:ℝ)⁻¹ • old_tau.Q_Im from rfl, gramMatrixReal_smul,
+      SiegelUpperHalfSpace.toMatrix_map_im]
+  have hhalf_toMatrix : old_tau_half.toMatrix = (2:ℂ)⁻¹ • old_tau.toMatrix := by
+    ext i j
+    have hre := congrFun (congrFun hhalf_toMatrix_re i) j
+    have him := congrFun (congrFun hhalf_toMatrix_im i) j
+    simp only [Matrix.map_apply, Matrix.smul_apply, smul_eq_mul] at hre him
+    apply Complex.ext
+    · simpa using hre
+    · simpa using him
+  have hunit : IsUnit old_tau.toMatrix.det :=
+    siegelDenom_Smatrix (R := ℤ) (g := g) old_tau.toMatrix ▸
+      siegelDenom_isUnit (Sp2gR.Smatrix (R := ℤ) (g := g)) old_tau
+  have hinv_smul : old_tau_half.toMatrix⁻¹ = (2:ℂ) • old_tau.toMatrix⁻¹ := by
+    rw [hhalf_toMatrix]
+    apply Matrix.inv_eq_right_inv
+    rw [smul_mul_smul, Matrix.mul_nonsing_inv old_tau.toMatrix hunit]
+    norm_num
+  change
+    Complex.exp (↑Real.pi * Complex.I *
+      (((latticeQuadraticMap
+          ((2:ℝ) • ((Sp2gR.Smatrix (R := ℤ) (g := g)) • old_tau_half).Q_Re)) x_summand : ℝ) +
+        Complex.I *
+          ((latticeQuadraticMap
+              ((2:ℝ) • ((Sp2gR.Smatrix (R := ℤ) (g := g)) • old_tau_half).Q_Im)) x_summand : ℝ))
+      + 2 * ↑Real.pi * Complex.I * (z x_summand)) = _
+  rw [latticeQuadraticMap_apply, latticeQuadraticMap_apply]
+  have hAB := x_summand_quadratic_after_Smatrix (R := ℤ) old_tau_half x_summand
+  rw [hinv_smul] at hAB
+  have hsum_smul : (∑ i, ∑ j, ((2:ℂ) • old_tau.toMatrix⁻¹) i j *
+        ((toEuclidean_ZnRn x_summand) i : ℂ) * ((toEuclidean_ZnRn x_summand) j : ℂ))
+      = (2:ℂ) * ∑ i, ∑ j, old_tau.toMatrix⁻¹ i j *
+        ((toEuclidean_ZnRn x_summand) i : ℂ) * ((toEuclidean_ZnRn x_summand) j : ℂ) := by
+    rw [Finset.mul_sum]
+    refine Finset.sum_congr rfl fun i _ => ?_
+    rw [Finset.mul_sum]
+    refine Finset.sum_congr rfl fun j _ => ?_
+    simp only [Matrix.smul_apply, smul_eq_mul]
+    ring
+  rw [hsum_smul] at hAB
+  have hstep : ((((2:ℝ) • ((Sp2gR.Smatrix (R := ℤ) (g := g)) • old_tau_half).Q_Re)
+        (toEuclidean_ZnRn x_summand) : ℝ) : ℂ) +
+      Complex.I *
+        ((((2:ℝ) • ((Sp2gR.Smatrix (R := ℤ) (g := g)) • old_tau_half).Q_Im)
+          (toEuclidean_ZnRn x_summand) : ℝ) : ℂ) =
+      -(2:ℂ) * ∑ i, ∑ j, old_tau.toMatrix⁻¹ i j *
+        ((toEuclidean_ZnRn x_summand) i : ℂ) * ((toEuclidean_ZnRn x_summand) j : ℂ) := by
+    rw [show (Sp2gR.Smatrix (R := ℤ) (g := g)) • old_tau_half
+        = siegelSMul (Sp2gR.Smatrix (R := ℤ) (g := g)) old_tau_half from rfl,
+      QuadraticMap.smul_apply, QuadraticMap.smul_apply, smul_eq_mul, smul_eq_mul]
+    push_cast
+    linear_combination (2 : ℂ) * hAB
+  rw [hstep]
+  have hlat : ∀ (i : Fin g), (toEuclidean_ZnRn x_summand).ofLp i = (x_summand i : ℝ) := by
+    intro i
+    simp [latticeEmbedding, pre_latticeEmbedding]
+  simp only [hlat]
+  push_cast
+  ring_nf
+
+/-- `theta_summand_after_Smatrix`, restated with its RHS as a `modulatedGaussian` evaluated at the
+lattice point `toEuclidean_ZnRn x_summand` — the form needed to feed into
+`tsum_exp_neg_quadratic_matrix`/`modulatedGaussian_hasPoissonSummation` (`PoissonSummation.lean`)
+for the Poisson-resummation step. `A := (2 * I) • (thetaableToMatrix old_thetaable)⁻¹` carries the
+quadratic part; `b i := I * zCoord z i` carries the shift, via `z x_summand = ∑ i, x_summand i *
+zCoord z i` (`z_eq_sum`, `LatticeUtils.lean`). -/
+private lemma theta_summand_after_Smatrix_modulatedGaussian
+    (g : ℕ) (hg : g ≠ 0) (x_summand : Fin g → ℤ)
+    (old_thetaable : ThetaAbleQuadraticForm (R := ℤ) (M := Fin g → ℤ))
+    (z : (Fin g → ℤ) →ₗ[ℤ] ℂ) :
+    theta_summand_after g hg (x_summand := x_summand)
+      (M := Sp2gR.Smatrix (R := ℤ) (g := g))
+      (old_thetaable := old_thetaable) (z := z) =
+    modulatedGaussian ((2 * Complex.I) • (thetaableToMatrix old_thetaable)⁻¹)
+      (fun i => Complex.I * zCoord z i) (toEuclidean_ZnRn x_summand) := by
+  rw [theta_summand_after_Smatrix, modulatedGaussian]
+  have hlat : ∀ (i : Fin g), (toEuclidean_ZnRn x_summand).ofLp i = (x_summand i : ℝ) := by
+    intro i
+    simp [latticeEmbedding, pre_latticeEmbedding]
+  simp only [hlat, Matrix.smul_apply, smul_eq_mul]
+  have hz : (z x_summand : ℂ) = ∑ i, (x_summand i : ℂ) * zCoord z i := z_eq_sum z x_summand
+  rw [hz]
+  push_cast
+  congr 1
+  have hquad : (∑ i, ∑ j, 2 * Complex.I * (thetaableToMatrix old_thetaable)⁻¹ i j *
+        (x_summand i : ℂ) * (x_summand j : ℂ))
+      = 2 * Complex.I * ∑ i, ∑ j, (thetaableToMatrix old_thetaable)⁻¹ i j *
+          (x_summand i : ℂ) * (x_summand j : ℂ) := by
+    rw [Finset.mul_sum]
+    refine Finset.sum_congr rfl fun i _ => ?_
+    rw [Finset.mul_sum]
+    refine Finset.sum_congr rfl fun j _ => ?_
+    ring
+  have hlin : (∑ i, Complex.I * zCoord z i * (x_summand i : ℂ))
+      = Complex.I * ∑ i, (x_summand i : ℂ) * zCoord z i := by
+    rw [Finset.mul_sum]
+    refine Finset.sum_congr rfl fun i _ => ?_
+    ring
+  rw [hquad, hlin]
+  ring
+
+/-- `old_thetaable`'s own (untransformed) summand, restated as a `modulatedGaussian` at
+`A := (-I/2) • thetaableToMatrix old_thetaable` — the same `A` that
+`theta_fun_after_Smatrix_poisson_Minv`'s dual sum lands on. Direct from `complex_quadratic` on
+`old_tau` (no matrix inverse involved, unlike `theta_summand_after_Smatrix_modulatedGaussian`). -/
+private lemma theta_summand_after_zero_modulatedGaussian
+    (g : ℕ) (hg : g ≠ 0) (x : Fin g → ℤ)
+    (old_thetaable : ThetaAbleQuadraticForm (R := ℤ) (M := Fin g → ℤ))
+    (z : (Fin g → ℤ) →ₗ[ℤ] ℂ) :
+    theta_summand_after g hg (x_summand := x)
+        (M := Sp2gR.Tmatrix (0 : Matrix (Fin g) (Fin g) ℤ) Matrix.transpose_zero)
+        (old_thetaable := old_thetaable) (z := z) =
+    modulatedGaussian ((-Complex.I / 2) • thetaableToMatrix old_thetaable)
+      (fun i => Complex.I * zCoord z i) (toEuclidean_ZnRn x) := by
+  rw [theta_summand_after_zero, modulatedGaussian]
+  set old_tau_re := latticeQuadToEuclidean old_thetaable.qRe
+  set old_tau_im := latticeQuadToEuclidean old_thetaable.qIm
+  have old_tau_im_posdef : old_tau_im.PosDef := by
+    apply old_thetaable.qImRe_posdef old_tau_im
+    intro u
+    change old_tau_im (toEuclidean_ZnRn u) = old_thetaable.qIm u
     simpa [old_tau_im] using latticeQuadToEuclidean_restrict old_thetaable.qIm u
   let old_tau : SiegelUpperHalfSpace g :=
     ⟨old_tau_re, old_tau_im, by
@@ -1806,27 +1753,334 @@ private lemma theta_summand_after_Smatrix
       old_tau_im_posdef⟩
   have hmatrix : thetaableToMatrix old_thetaable = old_tau.toMatrix := rfl
   rw [hmatrix]
-  have hqre : (RiemannThetaAble_siegelSMul (R := ℤ) hg (Sp2gR.Smatrix (R := ℤ) (g := g))
-      old_thetaable).qRe x_summand =
-      (siegelSMul (Sp2gR.Smatrix (R := ℤ) (g := g)) old_tau).Q_Re
-        (latticeEmbedding (Fin g) x_summand) := by
-    show latticeQuadraticMap
-        (siegelSMul (Sp2gR.Smatrix (R := ℤ) (g := g)) old_tau).Q_Re x_summand = _
-    rw [latticeQuadraticMap_apply]
-  have hqim : (RiemannThetaAble_siegelSMul (R := ℤ) hg (Sp2gR.Smatrix (R := ℤ) (g := g))
-      old_thetaable).qIm x_summand =
-      (siegelSMul (Sp2gR.Smatrix (R := ℤ) (g := g)) old_tau).Q_Im
-        (latticeEmbedding (Fin g) x_summand) := by
-    show latticeQuadraticMap
-        (siegelSMul (Sp2gR.Smatrix (R := ℤ) (g := g)) old_tau).Q_Im x_summand = _
-    rw [latticeQuadraticMap_apply]
-  rw [hqre, hqim, x_summand_quadratic_after_Smatrix (R := ℤ) old_tau x_summand]
-  have hlat : ∀ (i : Fin g), ((latticeEmbedding (Fin g)) x_summand).ofLp i = (x_summand i : ℝ) := by
+  have hre : old_tau.Q_Re (toEuclidean_ZnRn x) = old_thetaable.qRe x := by
+    change old_tau_re (toEuclidean_ZnRn x) = old_thetaable.qRe x
+    simpa [old_tau_re] using latticeQuadToEuclidean_restrict old_thetaable.qRe x
+  have him : old_tau.Q_Im (toEuclidean_ZnRn x) = old_thetaable.qIm x := by
+    change old_tau_im (toEuclidean_ZnRn x) = old_thetaable.qIm x
+    simpa [old_tau_im] using latticeQuadToEuclidean_restrict old_thetaable.qIm x
+  have hquad := SiegelUpperHalfSpace.complex_quadratic old_tau (toEuclidean_ZnRn x)
+  rw [hre, him] at hquad
+  rw [hquad]
+  have hlat : ∀ (i : Fin g), (toEuclidean_ZnRn x).ofLp i = (x i : ℝ) := by
     intro i
     simp [latticeEmbedding, pre_latticeEmbedding]
   simp only [hlat]
+  have hz : (z x : ℂ) = ∑ i, (x i : ℂ) * zCoord z i := z_eq_sum z x
+  rw [hz]
   push_cast
+  congr 1
+  have hquadsum : (∑ i, ∑ j, ((-Complex.I / 2) • old_tau.toMatrix) i j *
+        (x i : ℂ) * (x j : ℂ))
+      = (-Complex.I / 2) * ∑ i, ∑ j, old_tau.toMatrix i j * (x i : ℂ) * (x j : ℂ) := by
+    rw [Finset.mul_sum]
+    refine Finset.sum_congr rfl fun i _ => ?_
+    rw [Finset.mul_sum]
+    refine Finset.sum_congr rfl fun j _ => ?_
+    simp only [Matrix.smul_apply, smul_eq_mul]
+    ring
+  have hlin : (∑ i, Complex.I * zCoord z i * (x i : ℂ))
+      = Complex.I * ∑ i, (x i : ℂ) * zCoord z i := by
+    rw [Finset.mul_sum]
+    refine Finset.sum_congr rfl fun i _ => ?_
+    ring
+  rw [hquadsum, hlin]
+  ring
+
+/-- Positive real scalars preserve `Matrix.PosDef` for real matrices. -/
+private lemma posDef_smul {c : ℝ} (hc : 0 < c) {S : Matrix (Fin g) (Fin g) ℝ} (hS : S.PosDef) :
+    (c • S).PosDef := by
+  refine Matrix.PosDef.of_dotProduct_mulVec_pos ?_ fun x hx => ?_
+  · rw [Matrix.isHermitian_iff_isSymm]
+    show (c • S).transpose = c • S
+    rw [Matrix.transpose_smul, Matrix.isHermitian_iff_isSymm.mp hS.isHermitian]
+  · rw [Matrix.smul_mulVec, dotProduct_smul, smul_eq_mul]
+    exact mul_pos hc (hS.dotProduct_mulVec_pos hx)
+
+/-- `thetaableToMatrix old_thetaable` is invertible: it is `old_tau.toMatrix` for the
+`SiegelUpperHalfSpace` point built from `old_thetaable`, and `siegelDenom (Sp2gR.Smatrix) Z = Z`
+(`siegelDenom_Smatrix`) turns `siegelDenom_isUnit` into invertibility of `Z` itself. -/
+private lemma thetaableToMatrix_det_isUnit
+    (old_thetaable : ThetaAbleQuadraticForm (R := ℤ) (M := Fin g → ℤ)) :
+    IsUnit (thetaableToMatrix old_thetaable).det := by
+  set old_tau_re := latticeQuadToEuclidean old_thetaable.qRe
+  set old_tau_im := latticeQuadToEuclidean old_thetaable.qIm
+  have old_tau_im_posdef : old_tau_im.PosDef := by
+    apply old_thetaable.qImRe_posdef old_tau_im
+    intro u
+    change old_tau_im (toEuclidean_ZnRn u) = old_thetaable.qIm u
+    simpa [old_tau_im] using latticeQuadToEuclidean_restrict old_thetaable.qIm u
+  let old_tau : SiegelUpperHalfSpace g :=
+    ⟨old_tau_re, old_tau_im, by
+      simpa [old_tau_im] using latticeQuadToEuclidean_continuous old_thetaable.qIm,
+      old_tau_im_posdef⟩
+  have hmatrix : thetaableToMatrix old_thetaable = old_tau.toMatrix := rfl
+  rw [hmatrix]
+  exact siegelDenom_Smatrix (R := ℤ) (g := g) old_tau.toMatrix ▸
+    siegelDenom_isUnit (Sp2gR.Smatrix (R := ℤ) (g := g)) old_tau
+
+/-- The `A := (2 * I) • (thetaableToMatrix old_thetaable)⁻¹` used in
+`theta_summand_after_Smatrix_modulatedGaussian` is symmetric and has positive-definite real part —
+the two hypotheses `modulatedGaussian_hasPoissonSummation` needs. `Re(A) = -2 • Im(M⁻¹)` (`M :=
+thetaableToMatrix old_thetaable`), and `Im(-M⁻¹) = Im(siegelMatrixAction Smatrix M)` is
+positive-definite by `siegelMatrixAction_im_posDef` (the standard fact that `S_g` preserves the
+Siegel upper half-space). -/
+private lemma Smatrix_A_symm_and_posDef
+    (old_thetaable : ThetaAbleQuadraticForm (R := ℤ) (M := Fin g → ℤ)) :
+    ((2 * Complex.I) • (thetaableToMatrix old_thetaable)⁻¹).IsSymm ∧
+      ((((2 * Complex.I) • (thetaableToMatrix old_thetaable)⁻¹)).map Complex.re).PosDef := by
+  set old_tau_re := latticeQuadToEuclidean old_thetaable.qRe
+  set old_tau_im := latticeQuadToEuclidean old_thetaable.qIm
+  have old_tau_im_posdef : old_tau_im.PosDef := by
+    apply old_thetaable.qImRe_posdef old_tau_im
+    intro u
+    change old_tau_im (toEuclidean_ZnRn u) = old_thetaable.qIm u
+    simpa [old_tau_im] using latticeQuadToEuclidean_restrict old_thetaable.qIm u
+  let old_tau : SiegelUpperHalfSpace g :=
+    ⟨old_tau_re, old_tau_im, by
+      simpa [old_tau_im] using latticeQuadToEuclidean_continuous old_thetaable.qIm,
+      old_tau_im_posdef⟩
+  have hmatrix : thetaableToMatrix old_thetaable = old_tau.toMatrix := rfl
+  rw [hmatrix]
+  have hMinv_symm : old_tau.toMatrix⁻¹.IsSymm := old_tau.toMatrix_isSymm.inv
+  have hMinv_ij : ∀ i j, old_tau.toMatrix⁻¹ i j = old_tau.toMatrix⁻¹ j i := fun i j => by
+    have h := congrFun (congrFun hMinv_symm i) j
+    rw [Matrix.transpose_apply] at h
+    exact h.symm
+  refine ⟨?_, ?_⟩
+  · ext i j
+    rw [Matrix.transpose_apply]
+    show (2 * Complex.I) * old_tau.toMatrix⁻¹ j i = (2 * Complex.I) * old_tau.toMatrix⁻¹ i j
+    rw [hMinv_ij j i]
+  have hZsymm : (siegelMatrixAction (Sp2gR.Smatrix (R := ℤ) (g := g)) old_tau.toMatrix).IsSymm :=
+    siegelMatrixAction_isSymm (Sp2gR.Smatrix (R := ℤ) (g := g)) old_tau
+  have hZeq : siegelMatrixAction (Sp2gR.Smatrix (R := ℤ) (g := g)) old_tau.toMatrix =
+      -old_tau.toMatrix⁻¹ := siegelMatrixAction_Smatrix old_tau.toMatrix
+  have hYsymm : ((-old_tau.toMatrix⁻¹).map Complex.im).IsSymm := by
+    rw [← hZeq]
+    show (_ : Matrix (Fin g) (Fin g) ℝ).transpose = _
+    rw [← Matrix.transpose_map, hZsymm]
+  have hYposdef : ((-old_tau.toMatrix⁻¹).map Complex.im).PosDef := by
+    have h1 := siegelMatrixAction_im_posDef (Sp2gR.Smatrix (R := ℤ) (g := g)) old_tau
+    rw [hZeq] at h1
+    have h2 := gramMatrixReal_posDef _ h1
+    rwa [gramMatrixReal_quadraticMapOfMatrix hYsymm] at h2
+  have hneg : (-old_tau.toMatrix⁻¹).map Complex.im = -(old_tau.toMatrix⁻¹.map Complex.im) := by
+    ext i j
+    simp [Complex.neg_im]
+  rw [hneg] at hYposdef
+  have hre : ((2 * Complex.I) • old_tau.toMatrix⁻¹).map Complex.re
+      = (2 : ℝ) • (-(old_tau.toMatrix⁻¹.map Complex.im)) := by
+    ext i j
+    show ((2 * Complex.I) * old_tau.toMatrix⁻¹ i j).re
+        = (2 : ℝ) * (-(old_tau.toMatrix⁻¹ i j).im)
+    set w := old_tau.toMatrix⁻¹ i j
+    rw [show (2 * Complex.I) * w = -2 * w.im + Complex.I * (2 * w.re) by
+        conv_lhs => rw [← Complex.re_add_im w]
+        ring_nf
+        rw [Complex.I_sq]
+        ring]
+    simp
+  rw [hre]
+  exact posDef_smul (by norm_num) hYposdef
+
+/-- The Poisson-resummed `S_g` theta identity, summed over the lattice: applying
+`modulatedGaussian_hasPoissonSummation` to `theta_summand_after_Smatrix_modulatedGaussian` and
+rewriting the Fourier-transformed side back into a `modulatedGaussian`
+(`modulatedGaussian_fourierTransform_eq_modulatedGaussian`) turns `θ(z; S_g • old_thetaable)` into
+a rescaled sum over a *dual* `modulatedGaussian`, at `A⁻¹ = (-I/2) • thetaableToMatrix old_thetaable`
+(computed directly, rather than left as a double inverse, via `(2I)⁻¹ = -I/2`). -/
+theorem theta_fun_after_Smatrix_poisson
+    (g : ℕ) (hg : g ≠ 0)
+    (old_thetaable : ThetaAbleQuadraticForm (R := ℤ) (M := Fin g → ℤ))
+    (z : (Fin g → ℤ) →ₗ[ℤ] ℂ) :
+    ThetaAbleQuadraticForm.theta_fun (R := ℤ)
+      (thetaable := RiemannThetaAble_siegelSMul (R := ℤ) hg (Sp2gR.Smatrix (R := ℤ) (g := g))
+        old_thetaable) z =
+    1 / pivotSqrt g ((2 * Complex.I) • (thetaableToMatrix old_thetaable)⁻¹) *
+      Complex.exp (↑Real.pi * ∑ i, ∑ j,
+        ((-Complex.I / 2) • thetaableToMatrix old_thetaable) i j *
+          (Complex.I * zCoord z i) * (Complex.I * zCoord z j)) *
+      ∑' n : Fin g → ℤ, modulatedGaussian
+        ((-Complex.I / 2) • thetaableToMatrix old_thetaable)
+        (fun i => -Complex.I * ∑ j,
+          ((-Complex.I / 2) • thetaableToMatrix old_thetaable) i j * (Complex.I * zCoord z j))
+        (toEuclidean_ZnRn n) := by
+  set A : Matrix (Fin g) (Fin g) ℂ := (2 * Complex.I) • (thetaableToMatrix old_thetaable)⁻¹ with hA_def
+  set b : Fin g → ℂ := fun i => Complex.I * zCoord z i with hb_def
+  obtain ⟨hAsymm, hAre⟩ := Smatrix_A_symm_and_posDef old_thetaable
+  have hMunit : IsUnit (thetaableToMatrix old_thetaable).det :=
+    thetaableToMatrix_det_isUnit old_thetaable
+  have hAinv : A⁻¹ = (-Complex.I / 2) • thetaableToMatrix old_thetaable := by
+    rw [hA_def]
+    apply Matrix.inv_eq_right_inv
+    rw [smul_mul_smul, Matrix.nonsing_inv_mul (thetaableToMatrix old_thetaable) hMunit]
+    rw [show (2 * Complex.I) * (-Complex.I / 2) = 1 by
+      linear_combination (-1 : ℂ) * Complex.I_mul_I]
+    exact one_smul ℂ 1
+  have hL : ThetaAbleQuadraticForm.theta_fun (R := ℤ)
+      (thetaable := RiemannThetaAble_siegelSMul (R := ℤ) hg (Sp2gR.Smatrix (R := ℤ) (g := g))
+        old_thetaable) z
+      = ∑' x, theta_summand_after g hg (x_summand := x) (M := Sp2gR.Smatrix (R := ℤ) (g := g))
+          (old_thetaable := old_thetaable) (z := z) := rfl
+  rw [hL]
+  have hcongr : ∀ x, theta_summand_after g hg (x_summand := x)
+        (M := Sp2gR.Smatrix (R := ℤ) (g := g)) (old_thetaable := old_thetaable) (z := z)
+      = modulatedGaussian A b (toEuclidean_ZnRn x) :=
+    fun x => theta_summand_after_Smatrix_modulatedGaussian g hg x old_thetaable z
+  simp_rw [hcongr]
+  have hPoisson := modulatedGaussian_hasPoissonSummation hg A hAsymm hAre b
+  rw [hPoisson.2.2.2]
+  simp_rw [modulatedGaussian_fourierTransform_eq_modulatedGaussian hg A hAsymm hAre b, hAinv]
+  rw [tsum_mul_left]
+
+/-- The shift `n ↦ -2I ∑ᵢ (M⁻¹ z)ᵢ nᵢ` (`M := thetaableToMatrix old_thetaable`), built from `z` via
+`M⁻¹` with an extra `-2I` compensating factor: `zCoord (zMinvShift old_thetaable z) i =
+-2 * ∑ⱼ M⁻¹ i j * zCoord z j` (`zCoord_zMinvShift`). The `-2` is exactly what
+`theta_fun_after_Smatrix_poisson_Minv` needs to land its RHS `theta_fun` on the *plain* `z`,
+rather than a rescaled shift. -/
+noncomputable def zMinvShift (old_thetaable : ThetaAbleQuadraticForm (R := ℤ) (M := Fin g → ℤ))
+    (z : (Fin g → ℤ) →ₗ[ℤ] ℂ) : (Fin g → ℤ) →ₗ[ℤ] ℂ :=
+  bShiftMap (fun i => -2 * Complex.I * ∑ j, (thetaableToMatrix old_thetaable)⁻¹ i j * zCoord z j)
+
+lemma zCoord_zMinvShift (old_thetaable : ThetaAbleQuadraticForm (R := ℤ) (M := Fin g → ℤ))
+    (z : (Fin g → ℤ) →ₗ[ℤ] ℂ) (i : Fin g) :
+    zCoord (zMinvShift old_thetaable z) i =
+      -2 * ∑ j, (thetaableToMatrix old_thetaable)⁻¹ i j * zCoord z j := by
+  show (zMinvShift old_thetaable z) (Pi.single i 1) = _
+  unfold zMinvShift bShiftMap
+  show -Complex.I * ∑ k,
+      (-2 * Complex.I * ∑ j, (thetaableToMatrix old_thetaable)⁻¹ k j * zCoord z j) *
+      ((Pi.single i 1 : Fin g → ℤ) k : ℂ) = _
+  simp only [Pi.single_apply]
+  rw [Finset.sum_eq_single i (fun k _ hk => by simp [hk]) (fun h => absurd (Finset.mem_univ i) h)]
+  simp only [if_pos, mul_one, Int.cast_one]
+  rw [show (-Complex.I) * (-2 * Complex.I *
+        ∑ j, (thetaableToMatrix old_thetaable)⁻¹ i j * zCoord z j)
+      = 2 * (Complex.I * Complex.I) *
+        ∑ j, (thetaableToMatrix old_thetaable)⁻¹ i j * zCoord z j from by ring]
+  rw [Complex.I_mul_I]
+  ring
+
+/-- `theta_fun_after_Smatrix_poisson`, instantiated at the shift `zMinvShift old_thetaable z`
+(`M⁻¹` composed with an extra `-2I`) instead of a bare `z`, with the resulting `M * M⁻¹`/`M⁻¹ * M`
+pairs (`M := thetaableToMatrix old_thetaable`) cancelled: the exp argument's
+`∑∑ M (M⁻¹v) (M⁻¹v)` collapses to `∑∑ M⁻¹ v v` (`v i := zCoord z i`), and the `modulatedGaussian`
+shift's `∑ M (M⁻¹v)` collapses to `v` itself — the `-2I` in `zMinvShift` is exactly what makes the
+shift come out as the *plain* `I • v`, matching `theta_fun_eq_modulatedGaussian_tsum` on the nose. -/
+theorem theta_fun_after_Smatrix_poisson_Minv
+    (g : ℕ) (hg : g ≠ 0)
+    (old_thetaable : ThetaAbleQuadraticForm (R := ℤ) (M := Fin g → ℤ))
+    (z : (Fin g → ℤ) →ₗ[ℤ] ℂ) :
+    ThetaAbleQuadraticForm.theta_fun (R := ℤ)
+      (thetaable := RiemannThetaAble_siegelSMul (R := ℤ) hg (Sp2gR.Smatrix (R := ℤ) (g := g))
+        old_thetaable) (zMinvShift old_thetaable z) =
+    1 / pivotSqrt g ((2 * Complex.I) • (thetaableToMatrix old_thetaable)⁻¹) *
+      Complex.exp (2 * ↑Real.pi * Complex.I * ∑ i, ∑ j,
+        (thetaableToMatrix old_thetaable)⁻¹ i j * zCoord z i * zCoord z j) *
+      ∑' n : Fin g → ℤ, modulatedGaussian
+        ((-Complex.I / 2) • thetaableToMatrix old_thetaable)
+        (fun i => Complex.I * zCoord z i)
+        (toEuclidean_ZnRn n) := by
+  rw [theta_fun_after_Smatrix_poisson g hg old_thetaable (zMinvShift old_thetaable z)]
+  simp_rw [zCoord_zMinvShift]
+  set M := thetaableToMatrix old_thetaable with hM_def
+  set v : Fin g → ℂ := fun i => zCoord z i with hv_def
+  have hMunit : IsUnit M.det := thetaableToMatrix_det_isUnit old_thetaable
+  have hcancelB : ∀ i : Fin g, (∑ j, M i j * (∑ k, M⁻¹ j k * v k)) = v i := by
+    intro i
+    have h : (∑ j, M i j * (∑ k, M⁻¹ j k * v k)) = (M.mulVec (M⁻¹.mulVec v)) i := rfl
+    rw [h, Matrix.mulVec_mulVec, Matrix.mul_nonsing_inv M hMunit, Matrix.one_mulVec]
+  have hcancelA : (∑ i, ∑ j, M i j * (∑ k, M⁻¹ i k * v k) * (∑ k, M⁻¹ j k * v k))
+      = ∑ i, ∑ j, M⁻¹ i j * v i * v j := by
+    have hswap : (∑ i, ∑ j, M i j * (∑ k, M⁻¹ i k * v k) * (∑ k, M⁻¹ j k * v k))
+        = ∑ i, (∑ k, M⁻¹ i k * v k) * (∑ j, M i j * (∑ k, M⁻¹ j k * v k)) := by
+      refine Finset.sum_congr rfl fun i _ => ?_
+      rw [Finset.mul_sum]
+      refine Finset.sum_congr rfl fun j _ => ?_
+      ring
+    rw [hswap]
+    simp_rw [hcancelB]
+    refine Finset.sum_congr rfl fun i _ => ?_
+    rw [Finset.sum_mul]
+    refine Finset.sum_congr rfl fun j _ => ?_
+    ring
+  have hgoal_re : (fun i => -Complex.I * ∑ j, ((-Complex.I / 2) • M) i j *
+        (Complex.I * (-2 * ∑ k, M⁻¹ j k * v k)))
+      = fun i => Complex.I * v i := by
+    funext i
+    have hstep : ∑ j, ((-Complex.I / 2) • M) i j * (Complex.I * (-2 * ∑ k, M⁻¹ j k * v k))
+        = (-Complex.I / 2) * Complex.I * (-2) * (∑ j, M i j * (∑ k, M⁻¹ j k * v k)) := by
+      rw [Finset.mul_sum]
+      refine Finset.sum_congr rfl fun j _ => ?_
+      simp only [Matrix.smul_apply, smul_eq_mul]
+      ring
+    rw [hstep, hcancelB]
+    rw [show (-Complex.I) * ((-Complex.I / 2) * Complex.I * (-2) * v i)
+        = (-1 : ℂ) * (Complex.I * Complex.I) * Complex.I * v i from by ring]
+    rw [Complex.I_mul_I]
+    ring
+  have hgoal_quad : ∑ i, ∑ j, ((-Complex.I / 2) • M) i j *
+        (Complex.I * (-2 * ∑ k, M⁻¹ i k * v k)) * (Complex.I * (-2 * ∑ k, M⁻¹ j k * v k))
+      = 2 * Complex.I * ∑ i, ∑ j, M⁻¹ i j * v i * v j := by
+    have hpointwise : ∀ i j, ((-Complex.I / 2) • M) i j *
+          (Complex.I * (-2 * ∑ k, M⁻¹ i k * v k)) * (Complex.I * (-2 * ∑ k, M⁻¹ j k * v k))
+        = 2 * Complex.I * (M i j * (∑ k, M⁻¹ i k * v k) * (∑ k, M⁻¹ j k * v k)) := by
+      intro i j
+      simp only [Matrix.smul_apply, smul_eq_mul]
+      rw [show (-Complex.I / 2 * M i j) * (Complex.I * (-2 * ∑ k, M⁻¹ i k * v k)) *
+            (Complex.I * (-2 * ∑ k, M⁻¹ j k * v k))
+          = (-2 : ℂ) * (Complex.I * Complex.I) * Complex.I *
+            (M i j * (∑ k, M⁻¹ i k * v k) * (∑ k, M⁻¹ j k * v k)) from by ring]
+      rw [Complex.I_mul_I]
+      ring
+    simp_rw [hpointwise]
+    rw [show (∑ i, ∑ j, 2 * Complex.I * (M i j * (∑ k, M⁻¹ i k * v k) * (∑ k, M⁻¹ j k * v k)))
+        = 2 * Complex.I * (∑ i, ∑ j, M i j * (∑ k, M⁻¹ i k * v k) * (∑ k, M⁻¹ j k * v k)) from by
+      rw [Finset.mul_sum]
+      refine Finset.sum_congr rfl fun i _ => ?_
+      rw [Finset.mul_sum]]
+    rw [hcancelA]
+  rw [hgoal_re, hgoal_quad]
+  simp only [hv_def]
   ring_nf
+
+/-- `old_thetaable`'s own `theta_fun`, restated as a lattice sum of `modulatedGaussian`s at
+`A := (-I/2) • thetaableToMatrix old_thetaable` — obtained by summing
+`theta_summand_after_zero_modulatedGaussian` over the lattice. -/
+private lemma theta_fun_eq_modulatedGaussian_tsum
+    (g : ℕ) (hg : g ≠ 0)
+    (old_thetaable : ThetaAbleQuadraticForm (R := ℤ) (M := Fin g → ℤ))
+    (z : (Fin g → ℤ) →ₗ[ℤ] ℂ) :
+    ThetaAbleQuadraticForm.theta_fun (R := ℤ) (thetaable := old_thetaable) z =
+    ∑' n : Fin g → ℤ, modulatedGaussian ((-Complex.I / 2) • thetaableToMatrix old_thetaable)
+      (fun i => Complex.I * zCoord z i) (toEuclidean_ZnRn n) := by
+  have hR : ThetaAbleQuadraticForm.theta_fun (R := ℤ) (thetaable := old_thetaable) z
+      = ∑' x, theta_summand_after g hg (x_summand := x)
+          (M := Sp2gR.Tmatrix (0 : Matrix (Fin g) (Fin g) ℤ) Matrix.transpose_zero)
+          (old_thetaable := old_thetaable) (z := z) :=
+    tsum_congr fun x => (theta_summand_after_zero g hg x old_thetaable z).symm
+  rw [hR]
+  exact tsum_congr fun x => theta_summand_after_zero_modulatedGaussian g hg x old_thetaable z
+
+/-- The full `S_g` Poisson-resummation theta identity, `theta_fun` on both sides — the analogue of
+`theta_fun_after_Tmatrix_diagEven`/`theta_fun_after_GLmatrix_reindex` for the `S` generator. The
+`-2I` baked into `zMinvShift` makes `theta_fun_after_Smatrix_poisson_Minv`'s dual-Gaussian sum land
+*exactly* on `theta_fun_eq_modulatedGaussian_tsum`'s shift (`I • zCoord z`, no rescaling), so
+`old_thetaable`'s `theta_fun` on the RHS is at the plain `z`. -/
+theorem theta_fun_after_Smatrix
+    (g : ℕ) (hg : g ≠ 0)
+    (old_thetaable : ThetaAbleQuadraticForm (R := ℤ) (M := Fin g → ℤ))
+    (z : (Fin g → ℤ) →ₗ[ℤ] ℂ) :
+    ThetaAbleQuadraticForm.theta_fun (R := ℤ)
+      (thetaable := RiemannThetaAble_siegelSMul (R := ℤ) hg (Sp2gR.Smatrix (R := ℤ) (g := g))
+        old_thetaable) (zMinvShift old_thetaable z) =
+    1 / pivotSqrt g ((2 * Complex.I) • (thetaableToMatrix old_thetaable)⁻¹) *
+      Complex.exp (2 * ↑Real.pi * Complex.I * ∑ i, ∑ j,
+        (thetaableToMatrix old_thetaable)⁻¹ i j * zCoord z i * zCoord z j) *
+      ThetaAbleQuadraticForm.theta_fun (R := ℤ) (thetaable := old_thetaable) z := by
+  rw [theta_fun_after_Smatrix_poisson_Minv g hg old_thetaable z,
+    ← theta_fun_eq_modulatedGaussian_tsum g hg old_thetaable z]
 
 end ThetaTransformSMatrix
 

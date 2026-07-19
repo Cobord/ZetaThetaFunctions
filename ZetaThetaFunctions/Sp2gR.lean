@@ -11,7 +11,7 @@ This file is purely about the abstract group `Sp2gR (R := R) g := Matrix.symplec
 — block decomposition, multiplication formulas, symplectic relations, and the two classical
 families of generators (`Tmatrix`/upper-unipotent translations and `GLmatrix`/the `GL(g, ℤ)`
 action) — with no dependence on the Siegel upper half-space or theta functions. Those live in
-`ZetaFunctions/SiegelModular.lean`, which imports this file.
+`SiegelModular.lean`, which imports this file.
 
 ## Main definitions
 
@@ -22,9 +22,6 @@ action) — with no dependence on the Siegel upper half-space or theta functions
 * `Sp2gR.block_relations`/`_complex`: the symplectic relations `AᵀC=CᵀA`, `BᵀD=DᵀB`,
   `AᵀD-CᵀB=1`, `DᵀA-BᵀC=1` for the blocks of a symplectic matrix.
 
-## Status
-
-Fully proved, no gaps.
 -/
 
 variable {R : Type*} [CommRing R]

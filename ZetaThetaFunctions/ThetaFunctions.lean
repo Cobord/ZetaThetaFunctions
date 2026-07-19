@@ -830,26 +830,6 @@ variable {R M : Type u} [cr : CommRing R] [Module R ℝ] [AddCommGroup M] [Modul
 variable [SMulCommClass R ℂ ℂ]
 variable [thetaable : ThetaAbleQuadraticForm (R := R) (M := M)]
 
-/-- Casting `ℝ → ℂ` is `R`-linear: `IsScalarTower R ℝ ℂ` gives
-`(r • s : ℝ) • (1 : ℂ) = r • (s • (1 : ℂ))`, and `t • (1 : ℂ) = (t : ℂ)` for any `t : ℝ`
-(`Complex.real_smul`). -/
-noncomputable def ofRealLinear : ℝ →ₗ[R] ℂ where
-  toFun s := (s : ℂ)
-  map_add' := by intro a b; push_cast; ring
-  map_smul' r s := by
-    show ((r • s : ℝ) : ℂ) = r • ((s : ℝ) : ℂ)
-    have h1 : ((r • s : ℝ) : ℂ) = (r • s) • (1 : ℂ) := by rw [Complex.real_smul, mul_one]
-    have h2 : ((s : ℝ) : ℂ) = s • (1 : ℂ) := by rw [Complex.real_smul, mul_one]
-    rw [h1, h2, smul_assoc]
-
-/-- Multiplication by `I` is `R`-linear: this is exactly what `SMulCommClass R ℂ ℂ` buys us. -/
-noncomputable def mulILinear : ℂ →ₗ[R] ℂ where
-  toFun z := Complex.I * z
-  map_add' := by intro a b; ring
-  map_smul' r z := by
-    show Complex.I * (r • z) = r • (Complex.I * z)
-    rw [← smul_eq_mul, ← smul_eq_mul, ← smul_comm r Complex.I z]
-
 noncomputable def tau_operator :
     M →ₗ[R] (M →ₗ[R] ℂ) :=
   have reP : M →ₗ[R] (M →ₗ[R] ℝ) := thetaable.qRe.polarBilin (R:=R) (M:=M) (N:=ℝ)
@@ -934,34 +914,6 @@ section GaussianTheta
 
 variable {n : ℕ}
 
-/-- The standard embedding of the lattice `ι → ℤ` into `EuclideanSpace ℝ ι`, coordinatewise. -/
-noncomputable def pre_latticeEmbedding (ι R: Type*) [Fintype ι] [Ring R] (f : RingHom R ℝ):
-    (ι → R) →+ EuclideanSpace ℝ ι where
-  toFun n := (EuclideanSpace.equiv ι ℝ).symm (fun i => (f (n i) : ℝ))
-  map_zero' := by
-    apply (EuclideanSpace.equiv ι ℝ).injective
-    ext i
-    simp
-  map_add' := by
-    intro n m
-    apply (EuclideanSpace.equiv ι ℝ).injective
-    ext i
-    simp
-
-noncomputable def latticeEmbedding (ι: Type*) [Fintype ι]:
-    (ι → ℤ) →+ EuclideanSpace ℝ ι :=
-  pre_latticeEmbedding ι (R:=ℤ) (f:=Int.castRingHom ℝ)
-
-lemma latticeEmbeddingInjective (R : Type*) [Ring R] (f : RingHom R ℝ) (hf : Injective ⇑f) :
-    Injective ⇑(pre_latticeEmbedding (Fin n) R f) := by
-  rw [pre_latticeEmbedding]
-  simp only [Injective]
-  intro a1 a2 fa1a2
-  simp at fa1a2
-  funext x
-  have fa1a2 := congrFun fa1a2 x
-  exact hf fa1a2
-
 noncomputable def gaussianExponent
   (Q : QuadraticMap ℝ (EuclideanSpace ℝ (Fin n)) ℝ)
   (hQcont : Continuous Q)
@@ -1026,91 +978,7 @@ lemma bound_gaussian_exponent
     rw [zero_add] at key2
     exact key2
 
-/-- `Q (x - y) = Q x + Q y - Q.polarBilin x y`, the "completing the square" identity for a
-general quadratic map. -/
-theorem QuadraticMap.sub_eq_add_sub_polarBilin
-    {R M N : Type*} [CommRing R] [AddCommGroup M] [AddCommGroup N] [Module R M] [Module R N]
-    (Q : QuadraticMap R M N) (x y : M) :
-    Q (x - y) = Q x + Q y - Q.polarBilin x y := by
-  have e1 : QuadraticMap.polar (⇑Q) x (-y) = Q (x + -y) - Q x - Q (-y) := rfl
-  rw [Q.map_neg, ← sub_eq_add_neg, ← Q.polarBilin_apply_apply, map_neg] at e1
-  linear_combination (norm := abel1) -e1
 
-/-- The standard lattice embedding `(Fin n → ℤ) →+ EuclideanSpace ℝ (Fin n)`, as a `ℤ`-linear
-map (every `AddMonoidHom` between `ℤ`-modules is automatically `ℤ`-linear). -/
-noncomputable def pre_latticeEmbeddingLinear (R: Type*) [Ring R] (f : RingHom R ℝ) (n : ℕ):
-    (Fin n → R) →ₗ[ℤ] EuclideanSpace ℝ (Fin n) :=
-  (pre_latticeEmbedding (Fin n) (R:=R) (f:=f)).toIntLinearMap
-
-/-- A real quadratic form `Q` on `EuclideanSpace ℝ (Fin n)`, pulled back to a `ℤ`-valued
-(real-valued) quadratic form on the lattice `Fin n → ℤ` via the standard embedding. -/
-noncomputable def latticeQuadraticMap (Q : QuadraticMap ℝ (EuclideanSpace ℝ (Fin n)) ℝ) :
-    QuadraticMap ℤ (Fin n → ℤ) ℝ :=
-  (Q.restrictScalars (S := ℤ)).comp (pre_latticeEmbeddingLinear (R:=ℤ) (f:=Int.castRingHom ℝ) n)
-
-@[simp]
-lemma latticeQuadraticMap_apply (Q : QuadraticMap ℝ (EuclideanSpace ℝ (Fin n)) ℝ) (x : Fin n → ℤ) :
-    latticeQuadraticMap Q x = Q (latticeEmbedding (Fin n) x) := rfl
-
-/-- The Gram matrix of a real quadratic form `Q` on `EuclideanSpace ℝ (Fin n)`, with respect to
-the standard orthonormal basis: `gramMatrixReal Q i j = Q.polarBilin (e i) (e j)`. -/
-noncomputable def gramMatrixReal (Q : QuadraticMap ℝ (EuclideanSpace ℝ (Fin n)) ℝ) :
-    Matrix (Fin n) (Fin n) ℝ :=
-  LinearMap.BilinForm.toMatrix (EuclideanSpace.basisFun (Fin n) ℝ).toBasis Q.polarBilin
-
-lemma gramMatrixReal_apply (Q : QuadraticMap ℝ (EuclideanSpace ℝ (Fin n)) ℝ) (i j : Fin n) :
-    gramMatrixReal Q i j =
-      Q.polarBilin (EuclideanSpace.basisFun (Fin n) ℝ i) (EuclideanSpace.basisFun (Fin n) ℝ j) := by
-  rw [gramMatrixReal, LinearMap.BilinForm.toMatrix_apply]
-  simp
-
-/-- `gramMatrixReal Q` is symmetric: `Q.polarBilin` is a symmetric bilinear form
-(`QuadraticMap.polar_comm`). -/
-lemma gramMatrixReal_symm (Q : QuadraticMap ℝ (EuclideanSpace ℝ (Fin n)) ℝ) (i j : Fin n) :
-    gramMatrixReal Q i j = gramMatrixReal Q j i := by
-  simp [gramMatrixReal_apply, QuadraticMap.polarBilin_apply_apply, QuadraticMap.polar_comm]
-
-/-- The Gram matrix of a positive definite real quadratic form is itself positive definite,
-via the basis-dependent equivalence between positive-definiteness of a symmetric bilinear form
-(here `2 • Q = Q.polarBilin.toQuadraticMap`) and positive-definiteness of its Gram matrix. -/
-lemma gramMatrixReal_posDef (Q : QuadraticMap ℝ (EuclideanSpace ℝ (Fin n)) ℝ) (hQ : Q.PosDef) :
-    (gramMatrixReal Q).PosDef := by
-  have hsymm : LinearMap.BilinForm.IsSymm Q.polarBilin := by
-    constructor
-    intro x y
-    simp [QuadraticMap.polarBilin_apply_apply, QuadraticMap.polar_comm]
-  rw [gramMatrixReal, ← LinearMap.BilinForm.posDef_toQuadraticMap_iff_matrix _ _ hsymm,
-    QuadraticMap.toQuadraticMap_polarBilin]
-  intro x hx
-  have hQx := hQ x hx
-  rw [QuadraticMap.smul_apply, nsmul_eq_mul]
-  push_cast
-  linarith
-
-lemma gramMatrixReal_det_isUnit (Q : QuadraticMap ℝ (EuclideanSpace ℝ (Fin n)) ℝ) (hQ : Q.PosDef) :
-    IsUnit (gramMatrixReal Q).det :=
-  (Matrix.isUnit_iff_isUnit_det _).mp (gramMatrixReal_posDef Q hQ).isUnit
-
-/-- The coordinate `zᵢ ∈ R2` of a shift `z` against the `i`-th standard basis vector of the
-lattice `Fin n → R1`. -/
-noncomputable def zCoord {R1 R2 : Type} [Ring R1] [Ring R2] [Module R1 R2] (z : (Fin n → R1) →ₗ[R1] R2) (i : Fin n) : R2 :=
-  z (Pi.single i 1)
-
-/-- The imaginary part of `zCoord z`, the real linear functional whose Gram-matrix Riesz
-representative (w.r.t. a positive definite `qIm`) is the shift point `mu` used to complete the
-square. -/
-noncomputable def ellCoord {R : Type} [Ring R] [Module R ℂ] (z : (Fin n → R) →ₗ[R] ℂ) (i : Fin n) : ℝ :=
-  (zCoord z i).im
-
-lemma z_im_eq_sum (z : (Fin n → ℤ) →ₗ[ℤ] ℂ) (x : Fin n → ℤ) :
-    (z x).im = ∑ i, (x i : ℝ) * ellCoord z i := by
-  conv_lhs => rw [std_basis_sum x, map_sum]
-  rw [Complex.im_sum]
-  refine Finset.sum_congr rfl fun i _ => ?_
-  rw [map_zsmul, zsmul_eq_mul]
-  show (((x i : ℤ) : ℂ) * zCoord z i).im = (x i : ℝ) * ellCoord z i
-  rw [Complex.mul_im]
-  simp [ellCoord]
 
 /-- The shift point `mu`, obtained from `z` by "completing the square": the unique point with
 `Q_Im.polarBilin y mu = -2 * ⟪ellCoord z, y⟫` for all `y`, via inverting `Q_Im`'s (invertible,
@@ -1126,7 +994,7 @@ sign) the linear term `Im (z x)` contributed by the shift. -/
 lemma polarBilin_latticeEmbedding_muOfShift
     (Q_Im : QuadraticMap ℝ (EuclideanSpace ℝ (Fin n)) ℝ) (hQIm : Q_Im.PosDef)
     (z : (Fin n → ℤ) →ₗ[ℤ] ℂ) (x : Fin n → ℤ) :
-    Q_Im.polarBilin (latticeEmbedding (Fin n) x) (muOfShift Q_Im z) =
+    Q_Im.polarBilin (toEuclidean_ZnRn x) (muOfShift Q_Im z) =
       -2 * (z x).im := by
   set b := (EuclideanSpace.basisFun (Fin n) ℝ).toBasis with hb
   have hcoord : ∀ y : EuclideanSpace ℝ (Fin n), (b.repr y : Fin n → ℝ) = fun i => y i := by
@@ -1134,7 +1002,7 @@ lemma polarBilin_latticeEmbedding_muOfShift
     funext i
     rw [hb, OrthonormalBasis.coe_toBasis_repr_apply, EuclideanSpace.basisFun_repr]
   rw [LinearMap.BilinForm.apply_eq_dotProduct_toMatrix_mulVec b, hcoord, hcoord]
-  show (fun i => (latticeEmbedding (Fin n) x) i) ⬝ᵥ
+  show (fun i => (toEuclidean_ZnRn x) i) ⬝ᵥ
       (gramMatrixReal Q_Im).mulVec ((EuclideanSpace.equiv (Fin n) ℝ).symm
         ((gramMatrixReal Q_Im)⁻¹.mulVec (fun i => -2 * ellCoord z i)) : Fin n → ℝ) = _
   rw [show ((EuclideanSpace.equiv (Fin n) ℝ).symm
@@ -1146,28 +1014,27 @@ lemma polarBilin_latticeEmbedding_muOfShift
   rw [dotProduct, Finset.mul_sum]
   congr 1
   ext i
-  rw [show (latticeEmbedding (Fin n) x) i = (x i : ℝ) from rfl]
+  rw [show (toEuclidean_ZnRn x) i = (x i : ℝ) from rfl]
   ring
 
 private lemma gaussianVPolyDecayHelper
   (n pow: ℕ) (a_const : ℝ) (ha : 0 < a_const) (shift : EuclideanSpace ℝ (Fin n))
 : ∀ᶠ (i : Fin n → ℤ) in cofinite,
-  rexp (-a_const * (‖(latticeEmbedding (Fin n)) i‖ - ‖shift‖) ^ 2) ≤ ‖(latticeEmbedding (Fin n)) i‖ ^ (-(pow:ℤ) - 1) := by
+  rexp (-a_const * (‖toEuclidean_ZnRn i‖ - ‖shift‖) ^ 2) ≤ ‖toEuclidean_ZnRn i‖ ^ (-(pow:ℤ) - 1) := by
   -- (1) the lattice embedding is proper: its norm tends to `∞` along the cofinite filter.
-  have htendsto : Tendsto (fun i : Fin n → ℤ => ‖(latticeEmbedding (Fin n)) i‖) cofinite atTop := by
+  have htendsto : Tendsto (fun i : Fin n → ℤ => ‖toEuclidean_ZnRn i‖) cofinite atTop := by
     rw [tendsto_atTop]
     intro b
     rw [eventually_cofinite]
-    have hsub : {i : Fin n → ℤ | ¬ b ≤ ‖(latticeEmbedding (Fin n)) i‖} ⊆
+    have hsub : {i : Fin n → ℤ | ¬ b ≤ ‖toEuclidean_ZnRn i‖} ⊆
         toEuclidean_ZnRn ⁻¹'
           (Metric.closedBall (0 : EuclideanSpace ℝ (Fin n)) b ∩ (stdLattice n : Set _)) := by
       intro i hi
       simp only [not_le, Set.mem_setOf_eq] at hi
-      refine ⟨?_, toEuclidean_mem_stdLattice i⟩
-      rw [Metric.mem_closedBall, dist_zero_right,
-        show toEuclidean_ZnRn i = latticeEmbedding (Fin n) i from rfl]
+      refine ⟨?_, latticeEmbedding_mem_stdLattice i⟩
+      rw [Metric.mem_closedBall, dist_zero_right]
       exact hi.le
-    exact (Set.Finite.preimage toEuclidean_injective.injOn
+    exact (Set.Finite.preimage latticeEmbedding_injective.injOn
       (ZSpan.setFinite_inter (EuclideanSpace.basisFun (Fin n) ℝ).toBasis
         Metric.isBounded_closedBall)).subset hsub
   -- (2) a Gaussian beats any negative power of the (recentred) radius, eventually as `R → ∞`.
@@ -1192,15 +1059,15 @@ private lemma gaussianVPolyDecayHelper
   exact htendsto.eventually hreal
 
 /-- For any fixed decay rate `a_const > 0`, recentring point `shift`, and polynomial degree `pow`,
-the Gaussian `exp (-a_const * ‖(latticeEmbedding (Fin n)) i - shift‖ ^ 2)` is eventually
-dominated by the negative power `‖(latticeEmbedding (Fin n)) i‖ ^ (-(pow : ℤ) - 1)`. -/
+the Gaussian `exp (-a_const * ‖((toEuclidean_ZnRn)) i - shift‖ ^ 2)` is eventually
+dominated by the negative power `‖((toEuclidean_ZnRn)) i‖ ^ (-(pow : ℤ) - 1)`. -/
 lemma gaussianVPolyDecay
   (n pow : ℕ) (a_const : ℝ) (a_const_pos: a_const > 0) (shift: EuclideanSpace ℝ (Fin n)):
   ∀ᶠ (i : Fin n → ℤ) in cofinite,
-    ‖rexp (-a_const * ‖(latticeEmbedding (Fin n)) i - shift‖ ^ 2)‖ ≤ ‖(latticeEmbedding (Fin n)) i‖ ^ (-(pow : ℤ) - 1) := by
+    ‖rexp (-a_const * ‖((toEuclidean_ZnRn)) i - shift‖ ^ 2)‖ ≤ ‖((toEuclidean_ZnRn)) i‖ ^ (-(pow : ℤ) - 1) := by
   have hnorm_exp : ∀ x : ℝ, ‖rexp x‖ = rexp x := fun x => Real.norm_of_nonneg (Real.exp_pos x).le
   simp only [hnorm_exp]
-  set inclusion_matrix := (latticeEmbedding (Fin n))
+  set inclusion_matrix := ((toEuclidean_ZnRn))
   -- drop the shift: `‖i - shift‖² ≥ (‖i‖ - ‖shift‖)²` always, so the Gaussian at `i - shift`
   -- is dominated by the (shift-free) Gaussian at the recentred radius `‖i‖ - ‖shift‖`.
   have hexp_le : ∀ i : Fin n → ℤ,
@@ -1234,14 +1101,14 @@ lemma reExponent_le (hn : n ≠ 0)
     (z : (Fin n → ℤ) →ₗ[ℤ] ℂ) :
     ∃ c K : ℝ, c > 0 ∧ ∀ x : Fin n → ℤ,
       -π * (latticeQuadraticMap Q_Im) x - 2 * π * (z x).im
-        ≤ -c * ‖latticeEmbedding (Fin n) x - muOfShift Q_Im z‖ ^ 2 + K := by
+        ≤ -c * ‖(toEuclidean_ZnRn) x - muOfShift Q_Im z‖ ^ 2 + K := by
   obtain ⟨c, d, hc, hbound⟩ :=
     bound_gaussian_exponent hn Q_Im hQIm_cont hQIm (muOfShift Q_Im z) 0
   refine ⟨c, π * Q_Im (muOfShift Q_Im z) - d, hc, fun x => ?_⟩
   have hsq := QuadraticMap.sub_eq_add_sub_polarBilin Q_Im
-    (latticeEmbedding (Fin n) x) (muOfShift Q_Im z)
+    ((toEuclidean_ZnRn) x) (muOfShift Q_Im z)
   rw [polarBilin_latticeEmbedding_muOfShift Q_Im hQIm z x] at hsq
-  have hb := hbound (latticeEmbedding (Fin n) x)
+  have hb := hbound ((toEuclidean_ZnRn) x)
   simp only [gaussianExponent, ContinuousMap.coe_mk, add_zero] at hb
   rw [hsq] at hb
   rw [latticeQuadraticMap_apply]
@@ -1252,18 +1119,19 @@ lemma reExponent_le (hn : n ≠ 0)
 instead of `ZLattice.summable_norm_rpow`. -/
 lemma summable_latticeNormSq_sub_rpow (mu : EuclideanSpace ℝ (Fin n)) {s : ℝ}
     (hs : (n : ℝ) / 2 < s) :
-    Summable (fun x : Fin n → ℤ => (‖latticeEmbedding (Fin n) x - mu‖ ^ 2) ^ (-s)) := by
+    Summable (fun x : Fin n → ℤ => (‖(toEuclidean_ZnRn) x - mu‖ ^ 2) ^ (-s)) := by
   have hr : (-2 * s : ℝ) < -(Module.finrank ℤ (stdLattice n) : ℝ) := by
     rw [finrank_stdLattice]; linarith
   have hinj : Function.Injective
-      (fun x : Fin n → ℤ => (⟨toEuclidean_ZnRn x, toEuclidean_mem_stdLattice x⟩ : stdLattice n)) :=
-    fun x y h => toEuclidean_injective (Subtype.ext_iff.mp h)
+      (fun x : Fin n → ℤ =>
+        (⟨(toEuclidean_ZnRn) x, latticeEmbedding_mem_stdLattice x⟩ : stdLattice n)) :=
+    fun x y h => latticeEmbedding_injective (Subtype.ext_iff.mp h)
   have key : ∀ x : Fin n → ℤ,
-      ‖(⟨toEuclidean_ZnRn x, toEuclidean_mem_stdLattice x⟩ : stdLattice n).1 - mu‖ ^ (-2 * s) =
-        (‖latticeEmbedding (Fin n) x - mu‖ ^ 2) ^ (-s) := fun x => by
-    show ‖toEuclidean_ZnRn x - mu‖ ^ (-2 * s) = (‖latticeEmbedding (Fin n) x - mu‖ ^ 2) ^ (-s)
-    rw [show toEuclidean_ZnRn x = latticeEmbedding (Fin n) x from rfl,
-      show (-2 * s : ℝ) = 2 * (-s) by ring, Real.rpow_mul (norm_nonneg _),
+      ‖(⟨(toEuclidean_ZnRn) x, latticeEmbedding_mem_stdLattice x⟩ : stdLattice n).1 - mu‖
+          ^ (-2 * s) =
+        (‖(toEuclidean_ZnRn) x - mu‖ ^ 2) ^ (-s) := fun x => by
+    show ‖(toEuclidean_ZnRn) x - mu‖ ^ (-2 * s) = (‖(toEuclidean_ZnRn) x - mu‖ ^ 2) ^ (-s)
+    rw [show (-2 * s : ℝ) = 2 * (-s) by ring, Real.rpow_mul (norm_nonneg _),
       show (2 : ℝ) = ((2 : ℕ) : ℝ) by norm_num, Real.rpow_natCast]
   exact ((ZLattice.summable_norm_sub_rpow (stdLattice n) (-2 * s) hr mu).comp_injective hinj).congr
     key
@@ -1295,7 +1163,7 @@ lemma gaussianThetaRate_bound (hn : n ≠ 0)
     (hQIm_cont : Continuous Q_Im) (hQIm : Q_Im.PosDef)
     (z : (Fin n → ℤ) →ₗ[ℤ] ℂ) (x : Fin n → ℤ) :
     -π * (latticeQuadraticMap Q_Im) x - 2 * π * (z x).im
-      ≤ -gaussianThetaRate hn Q_Im hQIm_cont hQIm z * ‖latticeEmbedding (Fin n) x - muOfShift Q_Im z‖ ^ 2
+      ≤ -gaussianThetaRate hn Q_Im hQIm_cont hQIm z * ‖(toEuclidean_ZnRn) x - muOfShift Q_Im z‖ ^ 2
         + gaussianThetaConst hn Q_Im hQIm_cont hQIm z :=
   (reExponent_le hn Q_Im hQIm_cont hQIm z).choose_spec.choose_spec.2 x
 
@@ -1314,32 +1182,31 @@ noncomputable def RiemannThetaAble
   to_compare_g z x :=
     Real.exp (gaussianThetaConst hn Q_Im hQIm_cont hQIm z) *
       Real.exp (-gaussianThetaRate hn Q_Im hQIm_cont hQIm z *
-        ‖latticeEmbedding (Fin n) x - muOfShift Q_Im z‖ ^ 2)
+        ‖(toEuclidean_ZnRn) x - muOfShift Q_Im z‖ ^ 2)
   to_compare_g_summable z := by
     set x_independent := rexp (gaussianThetaConst hn Q_Im hQIm_cont hQIm z)
     refine Summable.mul_left (a:=x_independent) ?key
     set a_const := gaussianThetaRate hn Q_Im hQIm_cont hQIm z
     have a_const_pos : 0 < a_const := gaussianThetaRate_pos hn Q_Im hQIm_cont hQIm z
     have key (pow : ℕ): ∀ᶠ (i : Fin n → ℤ) in cofinite,
-      ‖rexp (-a_const * ‖(latticeEmbedding (Fin n)) i - muOfShift Q_Im z‖ ^ 2)‖ ≤ ‖(latticeEmbedding (Fin n)) i‖ ^ (-(pow : ℤ) - 1) := by
+      ‖rexp (-a_const * ‖((toEuclidean_ZnRn)) i - muOfShift Q_Im z‖ ^ 2)‖ ≤ ‖((toEuclidean_ZnRn)) i‖ ^ (-(pow : ℤ) - 1) := by
       exact gaussianVPolyDecay n pow a_const a_const_pos (shift:=muOfShift Q_Im z)
     have key := key (n)
     refine Summable.of_norm_bounded_eventually
-      (f:=fun x => rexp (-a_const * ‖(latticeEmbedding (Fin n)) x - muOfShift Q_Im z‖ ^ 2))
-      (g:=fun x => ‖(latticeEmbedding (Fin n)) x‖ ^ (-(n:ℤ) - 1))
+      (f:=fun x => rexp (-a_const * ‖((toEuclidean_ZnRn)) x - muOfShift Q_Im z‖ ^ 2))
+      (g:=fun x => ‖((toEuclidean_ZnRn)) x‖ ^ (-(n:ℤ) - 1))
       (hg := ?pow_sum)
       (h := key)
     · have hr : (-(n:ℤ) - 1) < -(Module.finrank ℤ (stdLattice n) : ℤ) := by
         rw [finrank_stdLattice]; omega
       have hinj : Function.Injective
           (fun x : Fin n → ℤ =>
-            (⟨toEuclidean_ZnRn x, toEuclidean_mem_stdLattice x⟩ : stdLattice n)) :=
-        fun x y h => toEuclidean_injective (Subtype.ext_iff.mp h)
+            (⟨(toEuclidean_ZnRn) x, latticeEmbedding_mem_stdLattice x⟩ : stdLattice n)) :=
+        fun x y h => latticeEmbedding_injective (Subtype.ext_iff.mp h)
       have key2 : ∀ x : Fin n → ℤ,
-          ‖(⟨toEuclidean_ZnRn x, toEuclidean_mem_stdLattice x⟩ : stdLattice n).1‖ ^ (-(n:ℤ) - 1) =
-            ‖(latticeEmbedding (Fin n)) x‖ ^ (-(n:ℤ) - 1) := fun x => by
-        show ‖toEuclidean_ZnRn x‖ ^ (-(n:ℤ) - 1) = ‖(latticeEmbedding (Fin n)) x‖ ^ (-(n:ℤ) - 1)
-        rw [show toEuclidean_ZnRn x = latticeEmbedding (Fin n) x from rfl]
+          ‖(⟨(toEuclidean_ZnRn) x, latticeEmbedding_mem_stdLattice x⟩ : stdLattice n).1‖
+              ^ (-(n:ℤ) - 1) =
+            ‖((toEuclidean_ZnRn)) x‖ ^ (-(n:ℤ) - 1) := fun x => by rfl
       exact ((ZLattice.summable_norm_zpow (stdLattice n) (-(n:ℤ) - 1) hr).comp_injective hinj).congr
         key2
   comparison_eventual z := Filter.Eventually.of_forall fun x => by
@@ -1436,7 +1303,7 @@ lemma epsteinGaussianThetaAble_qRe_apply
     (epsteinGaussianThetaAble hn q hq τ hτ).qRe x = τ.re * (q x : ℝ) := by
   show latticeQuadraticMap (τ.re • gramQuadraticMap q) x = τ.re * (q x : ℝ)
   rw [latticeQuadraticMap_apply, QuadraticMap.smul_apply, smul_eq_mul,
-    show latticeEmbedding (Fin n) x = toEuclidean_ZnRn x from rfl, gramQuadraticMap_apply_toEuclidean]
+    show (toEuclidean_ZnRn) x = toEuclidean_ZnRn x from rfl, gramQuadraticMap_apply_toEuclidean]
 
 lemma epsteinGaussianThetaAble_qIm_apply
     (hn : n ≠ 0) (q : QuadraticMap ℤ (Fin n → ℤ) ℤ) (hq : q.PosDef) (τ : ℂ) (hτ : 0 < τ.im)
@@ -1444,7 +1311,7 @@ lemma epsteinGaussianThetaAble_qIm_apply
     (epsteinGaussianThetaAble hn q hq τ hτ).qIm x = τ.im * (q x : ℝ) := by
   show latticeQuadraticMap (τ.im • gramQuadraticMap q) x = τ.im * (q x : ℝ)
   rw [latticeQuadraticMap_apply, QuadraticMap.smul_apply, smul_eq_mul,
-    show latticeEmbedding (Fin n) x = toEuclidean_ZnRn x from rfl, gramQuadraticMap_apply_toEuclidean]
+    show (toEuclidean_ZnRn) x = toEuclidean_ZnRn x from rfl, gramQuadraticMap_apply_toEuclidean]
 
 end EpsteinGaussianTheta
 
@@ -1539,7 +1406,7 @@ theorem tsum_integral_lattice_term_eq_integral_tsum
       ring
     simp_rw [hrw]
     refine (Summable.mul_left _ ?_).mul_left _
-    obtain ⟨c, hc_pos, hc_le⟩ := epsteinLowerBound_exists hn q hq
+    obtain ⟨c, hc_pos, hc_le⟩ := LowerBound_of_pythagorean_exists hn q hq
     have hc_summable := (summable_latticeNormSq_rpow hs).mul_left (c ^ (-s.re))
     refine Summable.of_nonneg_of_le
       (fun x => Real.rpow_nonneg (by exact_mod_cast (hq x.1 x.2).le) _)
