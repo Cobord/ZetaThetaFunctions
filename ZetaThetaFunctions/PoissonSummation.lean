@@ -10,7 +10,7 @@ import ZetaThetaFunctions.SiegelUpperHalfSpace
 The matrix generalization of `Complex.tsum_exp_neg_quadratic`
 (`Mathlib.Analysis.SpecialFunctions.Gaussian.PoissonSummation`), needed as the analytic ingredient
 behind the `S_g` Siegel modular transformation law (`SiegelModular.lean`,
-`section ThetaTransformSMatrix`) and the Epstein zeta functional equation.
+`section ThetaTransformSMatrix`) and the zeta functional equation.
 
 This is the bridge file: it proves the discrete lattice-sum identity
 `tsum_exp_neg_quadratic_matrix` (by induction on `g` via one-coordinate Schur complementation,

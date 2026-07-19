@@ -6,15 +6,15 @@ import Mathlib.Analysis.MellinTransform
 import Mathlib.Analysis.SpecialFunctions.Gamma.Deriv
 import Mathlib.Analysis.SpecialFunctions.Gamma.Beta
 import Mathlib.LinearAlgebra.Matrix.Integer
-import ZetaThetaFunctions.EpsteinZeta
+import ZetaThetaFunctions.QuadraticFormZeta
 
 /-!
 # Theta Functions
 
 This file constructs multivariate theta functions `θ(z) = ∑' x : M, exp (π I Q(x) + 2π I ⟪z, x⟫)`
 for a complex quadratic form `Q = qRe + I qIm` (an analogue of a Siegel upper half-space point) and
-a linear shift `z`, and connects the resulting Gaussian sums to the Epstein zeta function of
-`EpsteinZeta.lean` via a Mellin transform.
+a linear shift `z`, and connects the resulting Gaussian sums to the zeta function of
+`QuadraticFormZeta.lean` via a Mellin transform.
 
 ## Sections
 
@@ -23,7 +23,7 @@ a linear shift `z`, and connects the resulting Gaussian sums to the Epstein zeta
 continuous map is itself invariant under those translations.
 
 ### `GeneralThetaAble`
-`ThetaAbleQuadraticForm`, the theta-function analogue of `EpsteinZeta.lean`'s `ZetaAbleQuadraticForm`:
+`ThetaAbleQuadraticForm`, the theta-function analogue of `QuadraticFormZeta.lean`'s `ZetaAbleQuadraticForm`:
 packages convergence of `∑' x, exp (π I Q x + 2π I ⟪z, x⟫)`, for *every* shift `z` (no half-plane
 restriction, since the quadratic term always dominates), as the existence of a summable comparison
 function eventually bounding the summand. Defines `theta_fun`, its unconditional summability
@@ -52,16 +52,16 @@ estimates of `GaussianTheta`.
 `jacobiThetaAble`: the classical one-dimensional Jacobi theta function `θ(z; τ)`, as the
 `n = 1`, `q = x²` special case of `RiemannThetaAble`, for `τ` in the upper half-plane.
 
-### `EpsteinGaussianTheta`
-`epsteinGaussianThetaAble`: the one-complex-parameter scalar slice `Q = τ • q` of
-`RiemannThetaAble` through a *fixed* positive-definite integral form `q` (from `EpsteinZeta.lean`),
+### `SliceGaussianTheta`
+`sliceGaussianThetaAble`: the one-complex-parameter scalar slice `Q = τ • q` of
+`RiemannThetaAble` through a *fixed* positive-definite integral form `q` (from `QuadraticFormZeta.lean`),
 generalizing `jacobiThetaAble` to any `q`. This is the theta function needed to relate `q`'s
-Epstein zeta function to a Gaussian sum via Mellin transform.
+zeta function to a Gaussian sum via Mellin transform.
 
-### `EpsteinThetaZetaMellin`
-The Mellin transform connecting the Epstein zeta function `ζ_q(s)` (`EpsteinZeta.lean`'s `zeta_fun` for
-`epsteinZetaAble`) to the theta sum `θ(0; itq)` of `epsteinGaussianThetaAble` at purely imaginary
-`τ = it`: `Γ(s) π⁻ˢ ζ_q(s) = ∫₀^∞ tˢ⁻¹ (θ(0; itq) - 1) dt` (`epstein_zeta_eq_theta_mellin'`),
+### `ThetaZetaMellin`
+The Mellin transform connecting the zeta function `ζ_q(s)` (`QuadraticFormZeta.lean`'s `zeta_fun` for
+`quadraticFormZetaAble`) to the theta sum `θ(0; itq)` of `sliceGaussianThetaAble` at purely imaginary
+`τ = it`: `Γ(s) π⁻ˢ ζ_q(s) = ∫₀^∞ tˢ⁻¹ (θ(0; itq) - 1) dt` (`zeta_eq_theta_mellin'`),
 obtained term-wise (`gammaIntegral_eq_lattice_term_mellin`) and summed via a Fubini/dominated
 convergence interchange of `∑'` and `∫` (`tsum_integral_lattice_term_eq_integral_tsum`).
 -/
@@ -1257,7 +1257,7 @@ lemma coordSqQuad_posDef {c : ℝ} (hc : 0 < c) : (coordSqQuad c).PosDef := by
 
 /-- The classical 1-dimensional Jacobi theta function `θ(z; τ) = theta_fun z`, with shift
 `z : (Fin 1 → ℤ) →ₗ[ℤ] ℂ` and modulus `Q x = τ x²` (i.e. `Q = τ • sq`, the `n = 1`, `q = sq` case
-of the `θ(z; τq)` slice from `epsteinGaussianThetaAble`) for `τ` in the upper half-plane
+of the `θ(z; τq)` slice from `sliceGaussianThetaAble`) for `τ` in the upper half-plane
 (`0 < τ.im`), split into its real and imaginary parts `qRe x = τ.re * x²` and
 `qIm x = τ.im * x²`. -/
 @[reducible]
@@ -1268,7 +1268,7 @@ noncomputable def jacobiThetaAble (τ : ℂ) (hτ : 0 < τ.im) :
 
 end JacobiTheta
 
-section EpsteinGaussianTheta
+section SliceGaussianTheta
 
 variable {n : ℕ}
 
@@ -1279,8 +1279,10 @@ definite), is restricted here to the *one-complex-parameter scalar slice* `Q = �
 `qRe = τ.re • q`, `qIm = τ.im • q`. So write `θ(z; τq)` for `theta_fun z` at this particular
 instance, to keep `q` visible — it is *not* the general Siegel-point theta `θ(z; Q)`. This
 generalizes `jacobiThetaAble` (the `n = 1` case, `q = sq`) to any such `q`, and connects this
-theta machinery back to the Epstein zeta function work in `EpsteinZeta.lean`, via
-`QuadraticFormUtils.lean`'s `gramQuadraticMap`/`posDefR`. Keeping the full `τ`-dependence here (rather than fixing `τ.re = 0`, the very
+theta machinery back to the zeta function work in `QuadraticFormZeta.lean`, via
+`QuadraticFormUtils.lean`'s `gramQuadraticMap`/`posDefR`.
+Keeping the full `τ`-dependence here
+(rather than fixing `τ.re = 0`, the very
 degenerate "Gaussian sum" case flagged in `ThetaAbleQuadraticForm`'s docstring) is what makes it
 possible to even *pose* questions of modularity: `θ(0; τq) = theta_const` at this instance (`z`
 fixed at `0`) is a function of `τ` alone, and modularity asks how it transforms under the action
@@ -1288,38 +1290,38 @@ of `SL(2, ℤ)` on `τ` in the upper half-plane (`τ ↦ τ + 1`, `τ ↦ -1/τ`
 from `tau_periodicity`/`one_periodicity`, which instead fix `τ` (equivalently `Q`) and vary the
 shift `z` in `θ(z; τq)` (under such a modular transformation, `z`, if not fixed at `0`, would
 itself need to transform along, e.g. `z ↦ z/(cτ+d)`, as for a Jacobi form; that transformation
-law is not built here). The Epstein zeta Mellin transform below only needs `θ(0; itq)`, the
+law is not built here). The zeta Mellin transform below only needs `θ(0; itq)`, the
 purely imaginary specialization `τ = it`, recovering `qRe = 0`, `qIm = t • q`. -/
 @[reducible]
-noncomputable def epsteinGaussianThetaAble
+noncomputable def sliceGaussianThetaAble
     (hn : n ≠ 0) (q : QuadraticMap ℤ (Fin n → ℤ) ℤ) (hq : q.PosDef) (τ : ℂ) (hτ : 0 < τ.im) :
     ThetaAbleQuadraticForm (R := ℤ) (M := Fin n → ℤ) :=
   RiemannThetaAble hn (τ.re • gramQuadraticMap q) (τ.im • gramQuadraticMap q)
     ((gramQuadraticMap_continuous q).const_smul τ.im) ((posDefR q hq).smul hτ)
 
-lemma epsteinGaussianThetaAble_qRe_apply
+lemma sliceGaussianThetaAble_qRe_apply
     (hn : n ≠ 0) (q : QuadraticMap ℤ (Fin n → ℤ) ℤ) (hq : q.PosDef) (τ : ℂ) (hτ : 0 < τ.im)
     (x : Fin n → ℤ) :
-    (epsteinGaussianThetaAble hn q hq τ hτ).qRe x = τ.re * (q x : ℝ) := by
+    (sliceGaussianThetaAble hn q hq τ hτ).qRe x = τ.re * (q x : ℝ) := by
   show latticeQuadraticMap (τ.re • gramQuadraticMap q) x = τ.re * (q x : ℝ)
   rw [latticeQuadraticMap_apply, QuadraticMap.smul_apply, smul_eq_mul,
     show (toEuclidean_ZnRn) x = toEuclidean_ZnRn x from rfl, gramQuadraticMap_apply_toEuclidean]
 
-lemma epsteinGaussianThetaAble_qIm_apply
+lemma sliceGaussianThetaAble_qIm_apply
     (hn : n ≠ 0) (q : QuadraticMap ℤ (Fin n → ℤ) ℤ) (hq : q.PosDef) (τ : ℂ) (hτ : 0 < τ.im)
     (x : Fin n → ℤ) :
-    (epsteinGaussianThetaAble hn q hq τ hτ).qIm x = τ.im * (q x : ℝ) := by
+    (sliceGaussianThetaAble hn q hq τ hτ).qIm x = τ.im * (q x : ℝ) := by
   show latticeQuadraticMap (τ.im • gramQuadraticMap q) x = τ.im * (q x : ℝ)
   rw [latticeQuadraticMap_apply, QuadraticMap.smul_apply, smul_eq_mul,
     show (toEuclidean_ZnRn) x = toEuclidean_ZnRn x from rfl, gramQuadraticMap_apply_toEuclidean]
 
-end EpsteinGaussianTheta
+end SliceGaussianTheta
 
-section EpsteinThetaZetaMellin
+section ThetaZetaMellin
 
-/-- The term-wise Gamma integral identity behind the Mellin transform connecting the Epstein
-zeta function `ζ_q(s) = zeta_fun` (`EpsteinZeta.lean`) to `θ(0; itq) = theta_const` — the `θ(z; τq)`
-theta function of `epsteinGaussianThetaAble` (modulus the scalar slice `τq` through the fixed
+/-- The term-wise Gamma integral identity behind the Mellin transform connecting the
+zeta function `ζ_q(s) = zeta_fun` (`QuadraticFormZeta.lean`) to `θ(0; itq) = theta_const` — the `θ(z; τq)`
+theta function of `sliceGaussianThetaAble` (modulus the scalar slice `τq` through the fixed
 form `q`, *not* a general Siegel point), at shift `z = 0` and purely imaginary `τ = it` (`t > 0`):
 for a single nonzero lattice point `x` (with `q x > 0`), `π⁻ˢ Γ(s) (q x)⁻ˢ` is exactly the Mellin
 transform (in `t`) of the Gaussian summand `exp (-π (q x) t)` that appears in `θ(0; itq)`.
@@ -1348,13 +1350,12 @@ private lemma cpow_ne_zero_of_ne_zero {x y : ℂ} (hx : x ≠ 0) : x ^ y ≠ 0 :
 
 /-- The Fubini/dominated-convergence interchange of `∑'` and `∫` needed to sum the term-wise
 Mellin identity `gammaIntegral_eq_lattice_term_mellin` over every nonzero lattice point: for
-`s.re > n/2` (the same convergence threshold as `epsteinZetaAble`/`zeta_fun_summable`), summing
+`s.re > n/2` (the same convergence threshold as `quadraticFormZetaAble`/`zeta_fun_summable`), summing
 the Mellin transform of each lattice term commutes with integrating the (`t`-pointwise) sum of
 the lattice terms. The key fact making this tractable rather than merely "standard but technical"
 is that `∫ₜ ‖Fₓ(t)‖` has the *closed form* `Γ(s.re) / (π (q x))^(s.re)` (via
 `Real.integral_rpow_mul_exp_neg_mul_Ioi`), so its summability in `x` reduces exactly to the
-already-proved Epstein zeta convergence (`epsteinLowerBound_exists` +
-`summable_latticeNormSq_rpow`) rather than needing a fresh decay estimate. -/
+already-proved zeta convergence. -/
 theorem tsum_integral_lattice_term_eq_integral_tsum
     {n : ℕ} (hn : n ≠ 0) (q : QuadraticMap ℤ (Fin n → ℤ) ℤ) (hq : q.PosDef) {s : ℂ}
     (hs : s.re > (n : ℝ) / 2) :
@@ -1392,7 +1393,7 @@ theorem tsum_integral_lattice_term_eq_integral_tsum
         Real.norm_of_nonneg (Real.exp_pos _).le, Complex.sub_re, Complex.one_re]
     rw [setIntegral_congr_fun measurableSet_Ioi heq,
       Real.integral_rpow_mul_exp_neg_mul_Ioi hs0 (mul_pos Real.pi_pos hx)]
-  -- summability of that closed form reduces to the Epstein zeta convergence already proved.
+  -- summability of that closed form reduces to the zeta convergence already proved.
   have hsummable : Summable (fun x : {x : Fin n → ℤ // x ≠ 0} =>
       ∫ t : ℝ in Set.Ioi (0 : ℝ), ‖F x t‖) := by
     simp_rw [hnorm]
@@ -1432,17 +1433,17 @@ theorem tsum_integral_lattice_term_eq_integral_tsum
         simp only [hF]
         exact tsum_mul_left
 
-/-- The Mellin transform formula linking the Epstein zeta function `ζ_q(s)` of `q` (`EpsteinZeta.lean`)
-to the theta sum `∑' x ≠ 0, exp (-π (q x) t)` (i.e. `θ(0; itq) - 1`, the `epsteinGaussianThetaAble`
+/-- The Mellin transform formula linking the zeta function `ζ_q(s)` of `q` (`QuadraticFormZeta.lean`)
+to the theta sum `∑' x ≠ 0, exp (-π (q x) t)` (i.e. `θ(0; itq) - 1`, the `sliceGaussianThetaAble`
 theta function at shift `z = 0` and purely imaginary `τ = it`, see
-`epsteinGaussianThetaAble_qRe_apply`/`epsteinGaussianThetaAble_qIm_apply`):
+`sliceGaussianThetaAble_qRe_apply`/`sliceGaussianThetaAble_qIm_apply`):
 `Γ(s) π⁻ˢ ζ_q(s) = ∫₀^∞ tˢ⁻¹ (θ(0; itq) - 1) dt`, valid for `s.re > n/2`, the convergence threshold
-already required by `epsteinZetaAble`. The left side is `zeta_fun ⟨s, hs⟩` for the
-`epsteinZetaAble hn q hq` instance, written out as its defining sum to avoid threading that
+already required by `quadraticFormZetaAble`. The left side is `zeta_fun ⟨s, hs⟩` for the
+`quadraticFormZetaAble hn q hq` instance, written out as its defining sum to avoid threading that
 instance through named-argument elaboration. Obtained by summing
 `gammaIntegral_eq_lattice_term_mellin` over all nonzero lattice points and applying
 `tsum_integral_lattice_term_eq_integral_tsum`. -/
-theorem epstein_zeta_eq_theta_mellin
+theorem zeta_eq_theta_mellin
     {n : ℕ} (hn : n ≠ 0) (q : QuadraticMap ℤ (Fin n → ℤ) ℤ) (hq : q.PosDef)
     {s : ℂ} (hs : s.re > (n : ℝ) / 2) :
     Gamma s * (↑π : ℂ) ^ (-s) * ∑' x : {x : Fin n → ℤ // x ≠ 0}, ((q x.1 : ℤ) : ℂ) ^ (-s)
@@ -1490,24 +1491,24 @@ end TsumSplitPoint
 
 open ThetaAbleQuadraticForm ZetaAbleQuadraticForm
 
-/-- `θ(0; itq) = theta_const` for `epsteinGaussianThetaAble` at shift `z = 0` and the purely
+/-- `θ(0; itq) = theta_const` for `sliceGaussianThetaAble` at shift `z = 0` and the purely
 imaginary modulus `τ = it` (`t > 0`), minus the constant `1` contributed by the zero lattice
 point, is the same Gaussian sum over nonzero lattice points used in
-`epstein_zeta_eq_theta_mellin`. -/
-lemma epsteinGaussianThetaAble_theta_const_sub_one
+`zeta_eq_theta_mellin`. -/
+lemma sliceGaussianThetaAble_theta_const_sub_one
     {n : ℕ} (hn : n ≠ 0) (q : QuadraticMap ℤ (Fin n → ℤ) ℤ) (hq : q.PosDef) (t : ℝ) (ht : 0 < t) :
-    letI thetaable := epsteinGaussianThetaAble hn q hq (t * Complex.I) (by simpa using ht)
+    letI thetaable := sliceGaussianThetaAble hn q hq (t * Complex.I) (by simpa using ht)
     (theta_const (R := ℤ) (M := Fin n → ℤ) - 1 : ℂ)
       = ∑' x : {x : Fin n → ℤ // x ≠ 0}, (Real.exp (-(π * (q x.1 : ℝ) * t)) : ℂ) := by
-  letI thetaable := epsteinGaussianThetaAble hn q hq (t * Complex.I) (by simpa using ht)
+  letI thetaable := sliceGaussianThetaAble hn q hq (t * Complex.I) (by simpa using ht)
   set F : (Fin n → ℤ) → ℂ := fun x =>
     Complex.exp (↑π * Complex.I * ((thetaable.qRe x : ℂ) + Complex.I * (thetaable.qIm x : ℂ))
       + 2 * ↑π * Complex.I * ((0 : (Fin n → ℤ) →ₗ[ℤ] ℂ) x)) with hF
   have hpt : ∀ x : Fin n → ℤ, F x = (Real.exp (-(π * (q x : ℝ) * t)) : ℂ) := by
     intro x
     simp only [hF]
-    have hRe : thetaable.qRe x = 0 := by rw [epsteinGaussianThetaAble_qRe_apply]; simp
-    have hIm : thetaable.qIm x = t * (q x : ℝ) := by rw [epsteinGaussianThetaAble_qIm_apply]; simp
+    have hRe : thetaable.qRe x = 0 := by rw [sliceGaussianThetaAble_qRe_apply]; simp
+    have hIm : thetaable.qIm x = t * (q x : ℝ) := by rw [sliceGaussianThetaAble_qIm_apply]; simp
     rw [hRe, hIm, LinearMap.zero_apply, mul_zero, add_zero, Complex.ofReal_zero, zero_add,
       Complex.ofReal_exp]
     congr 1
@@ -1524,38 +1525,38 @@ lemma epsteinGaussianThetaAble_theta_const_sub_one
     tsum_congr (fun x : {x : Fin n → ℤ // x ≠ 0} => hpt x.1)]
   ring
 
-/-- `s.re > n/2` is exactly membership in `(epsteinZetaAble hn q hq).domain` (whose bound is
+/-- `s.re > n/2` is exactly membership in `(quadraticFormZetaAble hn q hq).domain` (whose bound is
 `n/2` by definition); isolated here so the construction of `⟨s, ·⟩ : zetaable.domain` doesn't
-have to be repeated at both the statement and proof of `epstein_zeta_eq_theta_mellin'`. -/
-lemma epsteinZetaAble_mem_domain
+have to be repeated at both the statement and proof of `zeta_eq_theta_mellin'`. -/
+lemma quadraticFormZetaAble_mem_domain
     {n : ℕ} (hn : n ≠ 0) (q : QuadraticMap ℤ (Fin n → ℤ) ℤ) (hq : q.PosDef)
-    {s : ℂ} (hs : s.re > (n : ℝ) / 2) : s ∈ (epsteinZetaAble hn q hq).domain := by
-  show s.re > (epsteinZetaAble hn q hq).s_bound
-  rwa [show (epsteinZetaAble hn q hq).s_bound = (n : ℝ) / 2 from rfl]
+    {s : ℂ} (hs : s.re > (n : ℝ) / 2) : s ∈ (quadraticFormZetaAble hn q hq).domain := by
+  show s.re > (quadraticFormZetaAble hn q hq).s_bound
+  rwa [show (quadraticFormZetaAble hn q hq).s_bound = (n : ℝ) / 2 from rfl]
 
-/-- `epstein_zeta_eq_theta_mellin`, restated with `zeta_fun`/`theta_const` directly: for
+/-- `zeta_eq_theta_mellin`, restated with `zeta_fun`/`theta_const` directly: for
 `s.re > n/2`, `Γ(s) π⁻ˢ ζ_q(s) = ∫₀^∞ tˢ⁻¹ (θ(0; itq) - 1) dt` where `θ(0; itq) = theta_const` is
-`epsteinGaussianThetaAble` at shift `z = 0` and the purely imaginary modulus `τ = it`. The relevant
+`sliceGaussianThetaAble` at shift `z = 0` and the purely imaginary modulus `τ = it`. The relevant
 `ZetaAbleQuadraticForm`/`ThetaAbleQuadraticForm` instances are introduced via `letI` (instance
 arguments cannot be supplied by name), and the theta integrand uses a `dif` to discharge the
-`0 < t` side condition `epsteinGaussianThetaAble` needs, pointwise on `t ∈ Set.Ioi 0`. -/
-theorem epstein_zeta_eq_theta_mellin'
+`0 < t` side condition `sliceGaussianThetaAble` needs, pointwise on `t ∈ Set.Ioi 0`. -/
+theorem zeta_eq_theta_mellin'
     {n : ℕ} (hn : n ≠ 0) (q : QuadraticMap ℤ (Fin n → ℤ) ℤ) (hq : q.PosDef)
     {s : ℂ} (hs : s.re > (n : ℝ) / 2) :
-    letI zetaable := epsteinZetaAble hn q hq
+    letI zetaable := quadraticFormZetaAble hn q hq
     Gamma s * (↑π : ℂ) ^ (-s) *
-      zeta_fun (⟨s, epsteinZetaAble_mem_domain hn q hq hs⟩ : zetaable.domain) =
+      zeta_fun (⟨s, quadraticFormZetaAble_mem_domain hn q hq hs⟩ : zetaable.domain) =
       ∫ t : ℝ in Set.Ioi (0 : ℝ), (t : ℂ) ^ (s - 1) *
         if ht : 0 < t then
-          letI thetaable := epsteinGaussianThetaAble hn q hq (t * Complex.I) (by simpa using ht)
+          letI thetaable := sliceGaussianThetaAble hn q hq (t * Complex.I) (by simpa using ht)
           (theta_const (R := ℤ) (M := Fin n → ℤ) - 1 : ℂ)
         else 0 := by
-  letI zetaable := epsteinZetaAble hn q hq
-  have hzeta : zeta_fun (⟨s, epsteinZetaAble_mem_domain hn q hq hs⟩ : zetaable.domain)
+  letI zetaable := quadraticFormZetaAble hn q hq
+  have hzeta : zeta_fun (⟨s, quadraticFormZetaAble_mem_domain hn q hq hs⟩ : zetaable.domain)
       = ∑' x : {x : Fin n → ℤ // x ≠ 0}, ((q x.1 : ℤ) : ℂ) ^ (-s) := rfl
-  rw [hzeta, epstein_zeta_eq_theta_mellin hn q hq hs]
+  rw [hzeta, zeta_eq_theta_mellin hn q hq hs]
   refine setIntegral_congr_fun measurableSet_Ioi fun t ht => ?_
-  rw [dif_pos (Set.mem_Ioi.mp ht), epsteinGaussianThetaAble_theta_const_sub_one hn q hq t
+  rw [dif_pos (Set.mem_Ioi.mp ht), sliceGaussianThetaAble_theta_const_sub_one hn q hq t
     (Set.mem_Ioi.mp ht)]
 
-end EpsteinThetaZetaMellin
+end ThetaZetaMellin

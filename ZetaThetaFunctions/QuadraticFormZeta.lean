@@ -13,9 +13,9 @@ import ZetaThetaFunctions.LatticeUtils
 import ZetaThetaFunctions.QuadraticFormUtils
 
 /-!
-# Epstein Zeta Functions
+# Quadratic Zeta Functions
 
-This file constructs the Epstein zeta function `ζ_q(s) = ∑'_{x ≠ 0} (q x)^(-s)` of a
+This file constructs the zeta function `ζ_q(s) = ∑'_{x ≠ 0} (q x)^(-s)` of a
 positive-definite integral quadratic form `q` on `ℤⁿ`, converging for `Re(s) > n / 2`.
 
 ## `ZetaAbleQuadraticForm`
@@ -27,9 +27,9 @@ summable comparison function `to_compare_g s` that eventually (away from a cofin
 exceptions) dominates the norm of the summand. This lets the same machinery be reused for other
 quadratic-form zeta functions without re-deriving a bespoke convergence criterion each time.
 
-## Epstein zeta
+## Quadratic Form zeta
 
-The file builds the `ZetaAbleQuadraticForm` instance `epsteinZetaAble` for a positive-definite
+The file builds the `ZetaAbleQuadraticForm` instance `quadraticFormZetaAble` for a positive-definite
 `q : QuadraticMap ℤ (Fin n → ℤ) ℤ`, on top of the shared lattice/quadratic-form infrastructure in
 `LatticeUtils.lean` (`latticeEmbedding`, `latticeNormSq`, `stdLattice`) and
 `QuadraticFormUtils.lean` (`gramMatrix`/`gramMatrixR`, `gramQuadraticMap`, `posDef_lower_bound`,
@@ -38,9 +38,8 @@ and the `ℤ → ℝ` positive-definiteness transfer `posDefR`):
 * `summable_latticeNormSq_rpow`: `ZLattice.summable_norm_rpow` applied to `stdLattice n`, giving
   the `p`-series convergence criterion for `∑'_{x≠0} ‖x‖^(-2s)`.
 * A compactness argument on the unit sphere (`posDef_lower_bound`) turns positive-definiteness of
-  the continuous extension into a uniform lower bound `Q x ≥ c * ‖x‖²`, which pulls back along the
-  lattice embedding to `epsteinLowerBound_exists`.
-* `epsteinZetaAble` assembles all of the above into the `ZetaAbleQuadraticForm` instance for
+  the continuous extension into a uniform lower bound `Q x ≥ c * ‖x‖²`.
+* `quadraticFormZetaAble` assembles all of the above into the `ZetaAbleQuadraticForm` instance for
   `q`, with comparison function `to_compare_g s x = (c * ‖x‖²)^(-Re s)`.
 -/
 
@@ -96,7 +95,7 @@ end ZetaAbleQuadraticForm
 
 end GeneralZetaAble
 
-section EpsteinZeta
+section QuadraticFormZeta
 
 variable {n : ℕ}
 
@@ -116,10 +115,10 @@ lemma summable_latticeNormSq_rpow {s : ℝ} (hs : (n : ℝ) / 2 < s) :
       show (2 : ℝ) = ((2 : ℕ) : ℝ) by norm_num, Real.rpow_natCast, norm_sq_latticeEmbedding]
   exact ((ZLattice.summable_norm_rpow (stdLattice n) (-2 * s) hr).comp_injective hinj).congr key
 
--- the Epstein zeta function of a rank-`n` lattice with positive definite form `q`,
+-- the zeta function of a rank-`n` lattice with positive definite form `q`,
 -- with the classical convergence threshold `Re(s) > n / 2`
 @[reducible]
-noncomputable def epsteinZetaAble
+noncomputable def quadraticFormZetaAble
     (hn : n ≠ 0) (q : QuadraticMap ℤ (Fin n → ℤ) ℤ) (hq : q.PosDef) :
     ZetaAbleQuadraticForm (R := ℤ) (M := Fin n → ℤ) (S := ℂ) :=
   let c := (LowerBound_of_pythagorean_exists hn q hq).choose
@@ -149,4 +148,4 @@ noncomputable def epsteinZetaAble
       exact Real.rpow_le_rpow_of_nonpos hcsum_pos (hc_le i.1) (neg_nonpos.mpr hsre_nonneg)
   }
 
-end EpsteinZeta
+end QuadraticFormZeta

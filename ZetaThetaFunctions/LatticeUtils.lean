@@ -14,7 +14,7 @@ import ZetaThetaFunctions.GeneralUtils
 /-!
 # Lattice utilities
 
-Shared, lattice-only infrastructure used across `EpsteinZeta.lean`, `ThetaFunctions.lean`,
+Shared, lattice-only infrastructure used across `QuadraticFormZeta.lean`, `ThetaFunctions.lean`,
 `QuadraticFormUtils.lean`, and `PoissonSummation.lean`: embedding a finite-rank lattice `ι → R`
 into `EuclideanSpace ℝ ι` (`latticeEmbedding`), the squared norm of a lattice point
 (`latticeNormSq`), and the standard lattice as a submodule (`stdLattice`). Nothing here is
