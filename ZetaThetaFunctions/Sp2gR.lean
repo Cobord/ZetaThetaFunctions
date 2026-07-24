@@ -1,6 +1,8 @@
 import Mathlib.LinearAlgebra.SymplecticGroup
 import Mathlib.LinearAlgebra.Matrix.SpecialLinearGroup
+import Mathlib.LinearAlgebra.Matrix.ProjectiveSpecialLinearGroup
 import Mathlib.Data.Complex.Basic
+import Mathlib.Data.Matrix.Basis
 import Mathlib.Tactic.NoncommRing
 import Mathlib.Tactic.LinearCombination
 
@@ -290,6 +292,107 @@ lemma Sp2gR.block_relations_complex (M : Sp2gR (R := R) g) :
 
 end BlockRelations
 
+section CenterClassification
+
+/-- A matrix commuting with every symmetric `g × g` matrix over `R` is a scalar matrix. Testing
+against `Matrix.single i i 1` (which is symmetric) shows every off-diagonal entry vanishes
+(`Matrix.row_eq_zero_of_commute_single`); testing against `Matrix.single i j 1 + Matrix.single j i 1`
+(`i ≠ j`, also symmetric) shows the surviving diagonal entries all agree. -/
+private lemma Sp2gR.isScalar_of_commute_isSymm {A : Matrix (Fin g) (Fin g) R}
+    (hcomm : ∀ X : Matrix (Fin g) (Fin g) R, X.IsSymm → A * X = X * A) :
+    ∃ c : R, A = c • (1 : Matrix (Fin g) (Fin g) R) := by
+  cases isEmpty_or_nonempty (Fin g)
+  · exact ⟨0, Subsingleton.elim _ _⟩
+  obtain ⟨i0⟩ := ‹Nonempty (Fin g)›
+  have hcomm_diag : ∀ i : Fin g, Commute (Matrix.single i i (1 : R)) A := by
+    intro i
+    have hsymm : (Matrix.single i i (1 : R)).IsSymm := by
+      show (Matrix.single i i (1 : R)).transpose = Matrix.single i i 1
+      rw [Matrix.transpose_single]
+    exact (hcomm _ hsymm).symm
+  have hoffdiag : ∀ i j : Fin g, i ≠ j → A i j = 0 := fun i j hij =>
+    Matrix.row_eq_zero_of_commute_single (hcomm_diag i) hij.symm
+  have hconst : ∀ i j : Fin g, i ≠ j → A i i = A j j := by
+    intro i j hij
+    have hji : j ≠ i := hij.symm
+    have hsymm : (Matrix.single i j (1 : R) + Matrix.single j i 1).IsSymm := by
+      show (Matrix.single i j (1 : R) + Matrix.single j i 1).transpose
+          = Matrix.single i j 1 + Matrix.single j i 1
+      rw [Matrix.transpose_add, Matrix.transpose_single, Matrix.transpose_single, add_comm]
+    have key := Matrix.ext_iff.mpr (hcomm _ hsymm) i j
+    simp [Matrix.mul_add, Matrix.add_mul, hij, hji] at key
+    exact key
+  refine ⟨A i0 i0, Matrix.ext fun i j => ?_⟩
+  rw [Matrix.smul_apply, Matrix.one_apply, smul_eq_mul]
+  split_ifs with h
+  · subst h
+    rcases eq_or_ne i i0 with rfl | hii0
+    · rw [mul_one]
+    · rw [mul_one]; exact hconst i i0 hii0
+  · rw [mul_zero]; exact hoffdiag i j h
+
+/-- A central element of `Sp(2g, R)` has vanishing off-diagonal blocks and equal, scalar-unit
+diagonal blocks: commuting with every `Sp2gR.Tmatrix B hB` (symmetric `B`) forces `blockC M = 0`
+and `blockA M * X = X * blockD M` for every symmetric `X`; commuting with `Sp2gR.Smatrix` on top
+of that forces `blockB M = -blockC M` and `blockA M = blockD M`, hence `blockA M` commutes with
+every symmetric matrix and is therefore scalar (`Sp2gR.isScalar_of_commute_isSymm`). The scalar
+`c` is a unit of `R`: the symplectic relation `blockAᵀ*blockD - blockCᵀ*blockB = 1` collapses (with
+`blockA=blockD=c•1`, `blockB=blockC=0`) to `(c*c)•1=1`, forcing `c*c=1`. This is the group-theoretic
+content behind `PSp2gR := Sp2gR ⧸ Subgroup.center (Sp2gR (R:=R) g)`: the classical
+`Sp(2g,R) / {scalars}` projective symplectic group. -/
+theorem Sp2gR.blocks_of_mem_center {M : Sp2gR (R := R) g}
+    (hM : M ∈ Subgroup.center (Sp2gR (R := R) g)) :
+    Sp2gR.blockB M = 0 ∧ Sp2gR.blockC M = 0 ∧
+      ∃ c : Rˣ, Sp2gR.blockA M = (c : R) • (1 : Matrix (Fin g) (Fin g) R) ∧
+        Sp2gR.blockD M = (c : R) • (1 : Matrix (Fin g) (Fin g) R) := by
+  have hcomm : ∀ N : Sp2gR (R := R) g, N * M = M * N := Subgroup.mem_center_iff.mp hM
+  have hC : Sp2gR.blockC M = 0 := by
+    have hT := congrArg Sp2gR.blockA (hcomm (Sp2gR.Tmatrix 1 Matrix.isSymm_one))
+    simp only [Sp2gR.blockA_mul, Sp2gR.blockA_Tmatrix, Sp2gR.blockB_Tmatrix,
+      Sp2gR.blockC_Tmatrix] at hT
+    linear_combination (norm := noncomm_ring) hT
+  have hAX : ∀ X : Matrix (Fin g) (Fin g) R, X.IsSymm →
+      Sp2gR.blockA M * X = X * Sp2gR.blockD M := by
+    intro X hX
+    have hT := congrArg Sp2gR.blockB (hcomm (Sp2gR.Tmatrix X hX))
+    simp only [Sp2gR.blockB_mul, Sp2gR.blockA_Tmatrix, Sp2gR.blockB_Tmatrix,
+      Sp2gR.blockD_Tmatrix] at hT
+    linear_combination (norm := noncomm_ring) -hT
+  have hBC : Sp2gR.blockB M = -Sp2gR.blockC M := by
+    have hS := congrArg Sp2gR.blockA (hcomm (Sp2gR.Smatrix (R := R) (g := g)))
+    simp only [Sp2gR.blockA_mul, Sp2gR.blockA_Smatrix, Sp2gR.blockB_Smatrix,
+      Sp2gR.blockC_Smatrix] at hS
+    linear_combination (norm := noncomm_ring) -hS
+  have hAD : Sp2gR.blockA M = Sp2gR.blockD M := by
+    have hS := congrArg Sp2gR.blockB (hcomm (Sp2gR.Smatrix (R := R) (g := g)))
+    simp only [Sp2gR.blockB_mul, Sp2gR.blockA_Smatrix, Sp2gR.blockB_Smatrix,
+      Sp2gR.blockD_Smatrix] at hS
+    linear_combination (norm := noncomm_ring) hS
+  have hB : Sp2gR.blockB M = 0 := by rw [hBC, hC, neg_zero]
+  cases isEmpty_or_nonempty (Fin g) with
+  | inl _ => exact ⟨hB, hC, 1, Subsingleton.elim _ _, Subsingleton.elim _ _⟩
+  | inr hne =>
+    obtain ⟨i0⟩ := hne
+    obtain ⟨c, hc⟩ := Sp2gR.isScalar_of_commute_isSymm (A := Sp2gR.blockA M) fun X hX => by
+      rw [hAX X hX, hAD]
+    have hd : Sp2gR.blockD M = c • (1 : Matrix (Fin g) (Fin g) R) := hAD.symm.trans hc
+    have hcc : c * c = 1 := by
+      obtain ⟨_, _, hr3, _⟩ := Sp2gR.block_relations M
+      rw [hc, hd, hB, hC, Matrix.transpose_zero, Matrix.zero_mul, sub_zero,
+        Matrix.transpose_smul, Matrix.transpose_one, Matrix.smul_mul, Matrix.one_mul,
+        smul_smul] at hr3
+      have h := congrFun (congrFun hr3 i0) i0
+      simpa using h
+    exact ⟨hB, hC, ⟨c, c, hcc, hcc⟩, hc, hd⟩
+
+/-- The projective symplectic group `PSp(2g, R) := Sp(2g, R) / Z(Sp(2g, R))`, the classical
+quotient by the (scalar, `Sp2gR.blocks_of_mem_center`) center. `Subgroup.center` is automatically
+normal, so no separate normality argument is needed. -/
+abbrev PSp2gR {R : Type*} [CommRing R] (g : ℕ) : Type _ :=
+  Sp2gR (R := R) g ⧸ Subgroup.center (Sp2gR (R := R) g)
+
+end CenterClassification
+
 section SL2Embedding
 
 /-- The block-matrix candidate associated to four fixed `g × g` matrices. For
@@ -468,5 +571,53 @@ theorem Sp2gR.SL2blockHom_classification
   change (f m : Matrix (Fin g ⊕ Fin g) (Fin g ⊕ Fin g) R) =
     Sp2gR.SL2blockMatrix 1 B B⁻¹ 1 m
   rw [hblocks m, hA, hD, hCeq]
+
+/-- `Sp2gR.SL2blockHom` sends the center of `SL(2, R)` (the scalar matrices `r • I`,
+`Matrix.SpecialLinearGroup.mem_center_iff`) into the center of `Sp(2g, R)`: at such a scalar `z`,
+the fixed-block image `Sp2gR.SL2blockMatrix 1 B B⁻¹ 1 z` collapses to the scalar matrix `r • I_{2g}`
+(the off-diagonal blocks `z 0 1 • B` and `z 1 0 • B⁻¹` vanish since `z` is diagonal), which is
+trivially central. -/
+theorem Sp2gR.SL2blockHom_mem_center
+    (B : Matrix (Fin g) (Fin g) R) (hB : B.IsSymm) (hBdet : IsUnit B.det)
+    {z : Matrix.SpecialLinearGroup (Fin 2) R}
+    (hz : z ∈ Subgroup.center (Matrix.SpecialLinearGroup (Fin 2) R)) :
+    Sp2gR.SL2blockHom B hB hBdet z ∈ Subgroup.center (Sp2gR (R := R) g) := by
+  obtain ⟨r, -, hr⟩ := Matrix.SpecialLinearGroup.mem_center_iff.mp hz
+  have h00 : z 0 0 = r := by
+    have h := congrFun (congrFun hr 0) 0
+    simpa [Matrix.scalar_apply] using h.symm
+  have h01 : z 0 1 = 0 := by
+    have h := congrFun (congrFun hr 0) 1
+    simpa [Matrix.scalar_apply] using h.symm
+  have h10 : z 1 0 = 0 := by
+    have h := congrFun (congrFun hr 1) 0
+    simpa [Matrix.scalar_apply] using h.symm
+  have h11 : z 1 1 = r := by
+    have h := congrFun (congrFun hr 1) 1
+    simpa [Matrix.scalar_apply] using h.symm
+  have himg : (Sp2gR.SL2blockHom B hB hBdet z : Matrix (Fin g ⊕ Fin g) (Fin g ⊕ Fin g) R)
+      = r • (1 : Matrix (Fin g ⊕ Fin g) (Fin g ⊕ Fin g) R) := by
+    show Sp2gR.SL2blockMatrix 1 B B⁻¹ 1 z = r • 1
+    rw [Sp2gR.SL2blockMatrix, h00, h01, h10, h11, zero_smul, zero_smul, ← Matrix.fromBlocks_one,
+      Matrix.fromBlocks_smul, smul_zero]
+  rw [Subgroup.mem_center_iff]
+  intro N
+  apply Subtype.ext
+  rw [Sp2gR.coe_mul, Sp2gR.coe_mul, himg, Matrix.smul_mul, Matrix.mul_smul, Matrix.one_mul,
+    Matrix.mul_one]
+
+/-- The fixed-block representation `Sp2gR.SL2blockHom B hB hBdet : SL(2,R) →* Sp(2g,R)` descends
+to the projective groups: `Sp2gR.SL2blockHom_mem_center` shows the center of `SL(2,R)` maps into
+the center of `Sp(2g,R)`, so the composite with the quotient map `Sp2gR.PSp2gR` factors through
+`PSL(2,R) := Sp2gR.SL2blockHom_mem_center`. -/
+noncomputable def Sp2gR.PSL2blockHom
+    (B : Matrix (Fin g) (Fin g) R) (hB : B.IsSymm) (hBdet : IsUnit B.det) :
+    Matrix.ProjectiveSpecialLinearGroup (Fin 2) R →* PSp2gR (R := R) g :=
+  QuotientGroup.lift _
+    ((QuotientGroup.mk' (Subgroup.center (Sp2gR (R := R) g))).comp
+      (Sp2gR.SL2blockHom B hB hBdet))
+    (fun z hz => by
+      rw [MonoidHom.mem_ker, MonoidHom.comp_apply]
+      exact (QuotientGroup.eq_one_iff _).mpr (Sp2gR.SL2blockHom_mem_center B hB hBdet hz))
 
 end SL2Embedding

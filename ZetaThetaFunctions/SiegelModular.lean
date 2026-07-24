@@ -680,6 +680,69 @@ noncomputable instance : MulAction (Sp2gR (R:=R) g) (SiegelUpperHalfSpace g) whe
 
 end BundledSiegelAction
 
+section SiegelActionHom
+
+/-- The Siegel action of `Sp(2g, R)` on `SiegelUpperHalfSpace g`, packaged as a group
+homomorphism into the permutation group of the Siegel upper half-space
+(`MulAction.toPermHom` applied to the `MulAction` instance above). -/
+noncomputable def siegelMatrixActionHom :
+    Sp2gR (R := R) g →* Equiv.Perm (SiegelUpperHalfSpace g) :=
+  MulAction.toPermHom (Sp2gR (R := R) g) (SiegelUpperHalfSpace g)
+
+lemma siegelMatrixActionHom_apply (M : Sp2gR (R := R) g) (τ : SiegelUpperHalfSpace g) :
+    siegelMatrixActionHom M τ = M • τ := rfl
+
+omit [Algebra R ℝ] [IsScalarTower R ℝ ℂ] in
+/-- Any central `M ∈ Sp(2g, R)` acts as the identity on the Siegel fractional-linear formula:
+`Sp2gR.blocks_of_mem_center` identifies `M`'s blocks as `A = D = c • I`, `B = C = 0` for a unit
+`c : Rˣ`, which collapses the fractional-linear formula `(c•Z)*(c•1)⁻¹` to `Z`. -/
+lemma siegelMatrixAction_of_mem_center {M : Sp2gR (R := R) g}
+    (hM : M ∈ Subgroup.center (Sp2gR (R := R) g)) (Z : Matrix (Fin g) (Fin g) ℂ) :
+    siegelMatrixAction M Z = Z := by
+  obtain ⟨hB, hC, c, hA, hD⟩ := Sp2gR.blocks_of_mem_center hM
+  have hkunit : IsUnit (algebraMap R ℂ (c : R)) := c.isUnit.map (algebraMap R ℂ)
+  have hmapc1 : (algebraMap R ℂ).mapMatrix ((c : R) • (1 : Matrix (Fin g) (Fin g) R))
+      = algebraMap R ℂ (c : R) • (1 : Matrix (Fin g) (Fin g) ℂ) := by
+    ext i j
+    simp only [RingHom.mapMatrix_apply, Matrix.map_apply, Matrix.smul_apply, Matrix.one_apply,
+      smul_eq_mul]
+    split_ifs <;> simp
+  have hnum : siegelNum M Z = algebraMap R ℂ (c : R) • Z := by
+    rw [siegelNum, hA, hB, hmapc1, map_zero, add_zero, Matrix.smul_mul, Matrix.one_mul]
+  have hdenom : siegelDenom M Z = algebraMap R ℂ (c : R) • (1 : Matrix (Fin g) (Fin g) ℂ) := by
+    rw [siegelDenom, hC, hD, hmapc1, map_zero, Matrix.zero_mul, zero_add]
+  have hdenom_inv : (algebraMap R ℂ (c : R) • (1 : Matrix (Fin g) (Fin g) ℂ))⁻¹
+      = (algebraMap R ℂ (c : R))⁻¹ • (1 : Matrix (Fin g) (Fin g) ℂ) := by
+    apply Matrix.inv_eq_right_inv
+    rw [Matrix.smul_mul, Matrix.one_mul, smul_smul, mul_inv_cancel₀ hkunit.ne_zero, one_smul]
+  rw [siegelMatrixAction, hnum, hdenom, hdenom_inv, Matrix.smul_mul, Matrix.mul_smul,
+    Matrix.mul_one, smul_smul, mul_inv_cancel₀ hkunit.ne_zero, one_smul]
+
+/-- The center of `Sp(2g, R)` lies in the kernel of the Siegel action
+(`siegelMatrixAction_of_mem_center`), so the action factors through `PSp2gR`. -/
+lemma center_le_ker_siegelMatrixActionHom :
+    Subgroup.center (Sp2gR (R := R) g) ≤ (siegelMatrixActionHom (R := R) (g := g)).ker := by
+  intro M hM
+  rw [MonoidHom.mem_ker]
+  ext τ
+  rw [siegelMatrixActionHom_apply]
+  show siegelSMul M τ = τ
+  have hZ' : siegelMatrixAction M τ.toMatrix = τ.toMatrix := siegelMatrixAction_of_mem_center hM _
+  have hRe : quadraticMapOfMatrix ((siegelMatrixAction M τ.toMatrix).map Complex.re) = τ.Q_Re := by
+    rw [hZ', τ.toMatrix_map_re, quadraticMapOfMatrix_gramMatrixReal]
+  have hIm : quadraticMapOfMatrix ((siegelMatrixAction M τ.toMatrix).map Complex.im) = τ.Q_Im := by
+    rw [hZ', τ.toMatrix_map_im, quadraticMapOfMatrix_gramMatrixReal]
+  exact SiegelUpperHalfSpace.ext hRe hIm
+
+/-- The Siegel action, as a group homomorphism from the projective symplectic group `PSp2gR` into
+the permutation group of the Siegel upper half-space; it factors through `PSp2gR` because the
+center acts trivially (`center_le_ker_siegelMatrixActionHom`). -/
+noncomputable def psiegelMatrixActionHom :
+    PSp2gR (R := R) g →* Equiv.Perm (SiegelUpperHalfSpace g) :=
+  QuotientGroup.lift _ siegelMatrixActionHom center_le_ker_siegelMatrixActionHom
+
+end SiegelActionHom
+
 section IntegralSiegel
 
 /-- The integral symplectic (Siegel modular) group `Sp(2g, ℤ)`, the same `Sp2gR` construction
