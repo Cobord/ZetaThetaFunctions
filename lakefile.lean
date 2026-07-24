@@ -19,3 +19,4 @@ require mathlib from git
 @[default_target] lean_lib ZetaThetaFunctions.SiegelUpperHalfSpace {}
 @[default_target] lean_lib ZetaThetaFunctions.Sp2gR {}
 @[default_target] lean_lib ZetaThetaFunctions.ThetaFunctions {}
+@[default_target] lean_lib ZetaThetaFunctions.MobiusInvariantProduct {}
