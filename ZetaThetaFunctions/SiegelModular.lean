@@ -1581,7 +1581,7 @@ for `A : Matrix (Fin g) (Fin g) ℂ` symmetric with `Re A` positive definite and
 /-- Under the Fourier generator `S_g`, the lattice index is unchanged at the level of the
 transformed quadratic exponent; its modulus matrix becomes `-τ⁻¹`. Summing these terms is the
 separate Poisson-resummation step. -/
-private lemma x_summand_quadratic_after_Smatrix
+lemma x_summand_quadratic_after_Smatrix
     (τ : SiegelUpperHalfSpace g) (x_summand : Fin g → ℤ) :
     ((siegelSMul (Sp2gR.Smatrix (R := R) (g := g)) τ).Q_Re
         (toEuclidean_ZnRn x_summand) : ℂ) +
@@ -1636,7 +1636,7 @@ private lemma x_summand_quadratic_after_Smatrix
 /-- The `g × g` complex matrix `qRe + I qIm` underlying a `ThetaAbleQuadraticForm`, in the
 standard orthonormal basis after transporting to `EuclideanSpace` via `latticeQuadToEuclidean` —
 the `ThetaAbleQuadraticForm` analogue of `SiegelUpperHalfSpace.toMatrix`. -/
-private noncomputable def thetaableToMatrix
+noncomputable def thetaableToMatrix
     (thetaable : ThetaAbleQuadraticForm (R := ℤ) (M := Fin g → ℤ)) :
     Matrix (Fin g) (Fin g) ℂ :=
   fun i j => (gramMatrixReal (latticeQuadToEuclidean thetaable.qRe) i j : ℂ) +
@@ -1647,7 +1647,7 @@ private noncomputable def thetaableToMatrix
 generators, this is *not* a termwise identity with any single summand of the un-transformed
 series (that correspondence only appears after the separate Poisson-resummation step) — it is a
 genuine computation of the transformed exponent, not a restatement of the definition. -/
-private lemma theta_summand_after_Smatrix
+lemma theta_summand_after_Smatrix
     (g : ℕ) (hg : g ≠ 0) (x_summand : Fin g → ℤ)
     (old_thetaable : ThetaAbleQuadraticForm (R := ℤ) (M := Fin g → ℤ))
     (z : (Fin g → ℤ) →ₗ[ℤ] ℂ) :
@@ -1850,7 +1850,7 @@ private lemma theta_summand_after_zero_modulatedGaussian
   ring
 
 /-- Positive real scalars preserve `Matrix.PosDef` for real matrices. -/
-private lemma posDef_smul {c : ℝ} (hc : 0 < c) {S : Matrix (Fin g) (Fin g) ℝ} (hS : S.PosDef) :
+lemma posDef_smul {c : ℝ} (hc : 0 < c) {S : Matrix (Fin g) (Fin g) ℝ} (hS : S.PosDef) :
     (c • S).PosDef := by
   refine Matrix.PosDef.of_dotProduct_mulVec_pos ?_ fun x hx => ?_
   · rw [Matrix.isHermitian_iff_isSymm]
@@ -1862,7 +1862,7 @@ private lemma posDef_smul {c : ℝ} (hc : 0 < c) {S : Matrix (Fin g) (Fin g) ℝ
 /-- `thetaableToMatrix old_thetaable` is invertible: it is `old_tau.toMatrix` for the
 `SiegelUpperHalfSpace` point built from `old_thetaable`, and `siegelDenom (Sp2gR.Smatrix) Z = Z`
 (`siegelDenom_Smatrix`) turns `siegelDenom_isUnit` into invertibility of `Z` itself. -/
-private lemma thetaableToMatrix_det_isUnit
+lemma thetaableToMatrix_det_isUnit
     (old_thetaable : ThetaAbleQuadraticForm (R := ℤ) (M := Fin g → ℤ)) :
     IsUnit (thetaableToMatrix old_thetaable).det := by
   set old_tau_re := latticeQuadToEuclidean old_thetaable.qRe
@@ -1887,7 +1887,7 @@ the two hypotheses `modulatedGaussian_hasPoissonSummation` needs. `Re(A) = -2 �
 thetaableToMatrix old_thetaable`), and `Im(-M⁻¹) = Im(siegelMatrixAction Smatrix M)` is
 positive-definite by `siegelMatrixAction_im_posDef` (the standard fact that `S_g` preserves the
 Siegel upper half-space). -/
-private lemma Smatrix_A_symm_and_posDef
+lemma Smatrix_A_symm_and_posDef
     (old_thetaable : ThetaAbleQuadraticForm (R := ℤ) (M := Fin g → ℤ)) :
     ((2 * Complex.I) • (thetaableToMatrix old_thetaable)⁻¹).IsSymm ∧
       ((((2 * Complex.I) • (thetaableToMatrix old_thetaable)⁻¹)).map Complex.re).PosDef := by

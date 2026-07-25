@@ -3,6 +3,7 @@ import Mathlib.Analysis.SpecialFunctions.Gaussian.PoissonSummation
 import Mathlib.Topology.ContinuousMap.Periodic
 import Mathlib.LinearAlgebra.Contraction
 import Mathlib.Analysis.MellinTransform
+import Mathlib.NumberTheory.LSeries.MellinEqDirichlet
 import Mathlib.Analysis.SpecialFunctions.Gamma.Deriv
 import Mathlib.Analysis.SpecialFunctions.Gamma.Beta
 import Mathlib.LinearAlgebra.Matrix.Integer
@@ -61,9 +62,9 @@ zeta function to a Gaussian sum via Mellin transform.
 ### `ThetaZetaMellin`
 The Mellin transform connecting the zeta function `ζ_q(s)` (`QuadraticFormZeta.lean`'s `zeta_fun` for
 `quadraticFormZetaAble`) to the theta sum `θ(0; itq)` of `sliceGaussianThetaAble` at purely imaginary
-`τ = it`: `Γ(s) π⁻ˢ ζ_q(s) = ∫₀^∞ tˢ⁻¹ (θ(0; itq) - 1) dt` (`zeta_eq_theta_mellin'`),
-obtained term-wise (`gammaIntegral_eq_lattice_term_mellin`) and summed via a Fubini/dominated
-convergence interchange of `∑'` and `∫` (`tsum_integral_lattice_term_eq_integral_tsum`).
+`τ = it`: `Γ(s) π⁻ˢ ζ_q(s) = ∫₀^∞ tˢ⁻¹ (θ(0; itq) - 1) dt` (`zeta_eq_theta_mellin'`), obtained from
+Mathlib's `hasSum_mellin_pi_mul` (`Mathlib.NumberTheory.LSeries.MellinEqDirichlet`) applied to `q`
+(`zeta_eq_theta_mellin`).
 -/
 
 open Function Set Complex Real
@@ -1319,94 +1320,73 @@ end SliceGaussianTheta
 
 section ThetaZetaMellin
 
-/-- The term-wise Gamma integral identity behind the Mellin transform connecting the
-zeta function `ζ_q(s) = zeta_fun` (`QuadraticFormZeta.lean`) to `θ(0; itq) = theta_const` — the `θ(z; τq)`
-theta function of `sliceGaussianThetaAble` (modulus the scalar slice `τq` through the fixed
-form `q`, *not* a general Siegel point), at shift `z = 0` and purely imaginary `τ = it` (`t > 0`):
-for a single nonzero lattice point `x` (with `q x > 0`), `π⁻ˢ Γ(s) (q x)⁻ˢ` is exactly the Mellin
-transform (in `t`) of the Gaussian summand `exp (-π (q x) t)` that appears in `θ(0; itq)`.
-Summing this identity over all `x ≠ 0` and exchanging `∑` with `∫` (not done here) would give the
-classical functional-equation ingredient `Γ(s) π⁻ˢ ζ_q(s) = ∫₀^∞ (θ(0; itq) - 1) t^{s-1} dt`. -/
-theorem gammaIntegral_eq_lattice_term_mellin
-    {n : ℕ} (q : QuadraticMap ℤ (Fin n → ℤ) ℤ) {x : Fin n → ℤ} (hx : 0 < (q x : ℝ))
-    {s : ℂ} (hs : 0 < s.re) :
-    (↑π : ℂ) ^ (-s) * Gamma s * ((q x : ℤ) : ℂ) ^ (-s) =
-      ∫ t : ℝ in Set.Ioi (0 : ℝ), (t : ℂ) ^ (s - 1) * (Real.exp (-(π * (q x : ℝ) * t)) : ℂ) := by
-  set a := π * (q x : ℝ) with ha_def
-  have ha : (0 : ℝ) < a := mul_pos Real.pi_pos hx
-  have hG : mellin (fun u => (Real.exp (-u) : ℂ)) s = Gamma s :=
-    (congrFun GammaIntegral_eq_mellin s).symm.trans (Complex.Gamma_eq_integral hs).symm
-  have hmellin := mellin_comp_mul_left (fun u => (Real.exp (-u) : ℂ)) s ha
-  rw [hG] at hmellin
-  simp only [mellin, smul_eq_mul] at hmellin
-  rw [hmellin, ha_def, Complex.ofReal_mul, mul_cpow_ofReal_nonneg Real.pi_pos.le hx.le]
-  push_cast
-  ring
+/-- The Mellin transform formula linking the zeta function `ζ_q(s)` of `q` (`QuadraticFormZeta.lean`)
+to the theta sum `∑' x ≠ 0, exp (-π (q x) t)` (i.e. `θ(0; itq) - 1`, the `sliceGaussianThetaAble`
+theta function at shift `z = 0` and purely imaginary `τ = it`, see
+`sliceGaussianThetaAble_qRe_apply`/`sliceGaussianThetaAble_qIm_apply`):
+`Γ(s) π⁻ˢ ζ_q(s) = ∫₀^∞ tˢ⁻¹ (θ(0; itq) - 1) dt`, valid for `s.re > n/2`, the convergence threshold
+already required by `quadraticFormZetaAble`. The left side is `zeta_fun ⟨s, hs⟩` for the
+`quadraticFormZetaAble hn q hq` instance, written out as its defining sum to avoid threading that
+instance through named-argument elaboration.
 
-/-- For `x ≠ 0`, `x ^ y ≠ 0` whenever the base `x` is itself nonzero (regardless of the
-exponent `y`) — the direction of `Complex.cpow_eq_zero_iff` that's needed repeatedly below. -/
-private lemma cpow_ne_zero_of_ne_zero {x y : ℂ} (hx : x ≠ 0) : x ^ y ≠ 0 :=
-  fun h => hx ((Complex.cpow_eq_zero_iff x y).mp h).1
-
-/-- The Fubini/dominated-convergence interchange of `∑'` and `∫` needed to sum the term-wise
-Mellin identity `gammaIntegral_eq_lattice_term_mellin` over every nonzero lattice point: for
-`s.re > n/2` (the same convergence threshold as `quadraticFormZetaAble`/`zeta_fun_summable`), summing
-the Mellin transform of each lattice term commutes with integrating the (`t`-pointwise) sum of
-the lattice terms. The key fact making this tractable rather than merely "standard but technical"
-is that `∫ₜ ‖Fₓ(t)‖` has the *closed form* `Γ(s.re) / (π (q x))^(s.re)` (via
-`Real.integral_rpow_mul_exp_neg_mul_Ioi`), so its summability in `x` reduces exactly to the
-already-proved zeta convergence. -/
-theorem tsum_integral_lattice_term_eq_integral_tsum
-    {n : ℕ} (hn : n ≠ 0) (q : QuadraticMap ℤ (Fin n → ℤ) ℤ) (hq : q.PosDef) {s : ℂ}
-    (hs : s.re > (n : ℝ) / 2) :
-    ∑' x : {x : Fin n → ℤ // x ≠ 0},
-        ∫ t : ℝ in Set.Ioi (0 : ℝ), (t : ℂ) ^ (s - 1) * (Real.exp (-(π * (q x.1 : ℝ) * t)) : ℂ)
+Obtained from Mathlib's `hasSum_mellin_pi_mul` (`Mathlib.NumberTheory.LSeries.MellinEqDirichlet`),
+the general "Mellin transform of a Dirichlet-type series" identity, applied with the constant
+coefficient `1` at each nonzero lattice point and `q` itself as the base sequence: it supplies the
+term-wise Gamma integral and the `∑'`/`∫` interchange. The genuinely quadratic-form-specific inputs
+it still needs are a `HasSum` (not just `Summable`) witness for the Gaussian lattice sum at each `t`
+(`hF`, via `sliceGaussianThetaAble`/`theta_fun_summable`) and the real-variable zeta convergence used
+for `h_sum` (via `LowerBound_of_pythagorean_exists`/`summable_latticeNormSq_rpow`, as in
+`quadraticFormZetaAble` itself; the `ZetaAbleQuadraticForm` class's `zeta_fun_summable` is avoided
+here since it hits a `whnf` timeout from unfolding two `@[reducible]` instances together). -/
+theorem zeta_eq_theta_mellin
+    {n : ℕ} (hn : n ≠ 0) (q : QuadraticMap ℤ (Fin n → ℤ) ℤ) (hq : q.PosDef)
+    {s : ℂ} (hs : s.re > (n : ℝ) / 2) :
+    Gamma s * (↑π : ℂ) ^ (-s) * ∑' x : {x : Fin n → ℤ // x ≠ 0}, ((q x.1 : ℤ) : ℂ) ^ (-s)
       = ∫ t : ℝ in Set.Ioi (0 : ℝ),
           (t : ℂ) ^ (s - 1) *
             ∑' x : {x : Fin n → ℤ // x ≠ 0}, (Real.exp (-(π * (q x.1 : ℝ) * t)) : ℂ) := by
-  have hs0 : (0 : ℝ) < s.re := lt_trans (by positivity) hs
-  set F : {x : Fin n → ℤ // x ≠ 0} → ℝ → ℂ :=
-    fun x t => (t : ℂ) ^ (s - 1) * (Real.exp (-(π * (q x.1 : ℝ) * t)) : ℂ) with hF
-  -- each `F x` is integrable on `Ioi 0`: its integral has the explicit nonzero value from
-  -- `gammaIntegral_eq_lattice_term_mellin`, and a non-integrable function integrates to `0`.
-  have hInt : ∀ x : {x : Fin n → ℤ // x ≠ 0},
-      Integrable (F x) (volume.restrict (Set.Ioi 0)) := by
-    intro x
-    have hx : (0 : ℝ) < (q x.1 : ℝ) := by exact_mod_cast hq x.1 x.2
-    have hval := gammaIntegral_eq_lattice_term_mellin q hx hs0
-    have hne : (↑π : ℂ) ^ (-s) * Gamma s * ((q x.1 : ℤ) : ℂ) ^ (-s) ≠ 0 :=
-      mul_ne_zero (mul_ne_zero (cpow_ne_zero_of_ne_zero (by exact_mod_cast Real.pi_ne_zero))
-        (Complex.Gamma_ne_zero_of_re_pos hs0))
-        (cpow_ne_zero_of_ne_zero (by exact_mod_cast hx.ne'))
-    by_contra hni
-    exact hne (hval.trans (MeasureTheory.integral_undef (by simpa only [hF] using hni)))
-  -- the norm of `∫ₜ Fₓ(t)` has the closed form `Γ(s.re) / (π (q x))^(s.re)`.
-  have hnorm : ∀ x : {x : Fin n → ℤ // x ≠ 0},
-      ∫ t : ℝ in Set.Ioi (0 : ℝ), ‖F x t‖ = (1 / (π * (q x.1 : ℝ))) ^ s.re * Real.Gamma s.re := by
-    intro x
-    have hx : (0 : ℝ) < (q x.1 : ℝ) := by exact_mod_cast hq x.1 x.2
-    have heq : ∀ t ∈ Set.Ioi (0 : ℝ),
-        ‖F x t‖ = t ^ (s.re - 1) * Real.exp (-(π * (q x.1 : ℝ) * t)) := by
-      intro t ht
-      simp only [hF]
-      rw [norm_mul, Complex.norm_cpow_eq_rpow_re_of_pos ht, Complex.norm_real,
-        Real.norm_of_nonneg (Real.exp_pos _).le, Complex.sub_re, Complex.one_re]
-    rw [setIntegral_congr_fun measurableSet_Ioi heq,
-      Real.integral_rpow_mul_exp_neg_mul_Ioi hs0 (mul_pos Real.pi_pos hx)]
-  -- summability of that closed form reduces to the zeta convergence already proved.
-  have hsummable : Summable (fun x : {x : Fin n → ℤ // x ≠ 0} =>
-      ∫ t : ℝ in Set.Ioi (0 : ℝ), ‖F x t‖) := by
-    simp_rw [hnorm]
+  have hs0 : 0 < s.re := lt_trans (by positivity) hs
+  set F : ℝ → ℂ :=
+    fun t => ∑' x : {x : Fin n → ℤ // x ≠ 0}, (Real.exp (-(π * (q x.1 : ℝ) * t)) : ℂ) with hF_def
+  have hp : ∀ x : {x : Fin n → ℤ // x ≠ 0}, (1 : ℂ) = 0 ∨ 0 < (q x.1 : ℝ) :=
+    fun x => Or.inr (by exact_mod_cast hq x.1 x.2)
+  -- for each `t > 0`, the Gaussian lattice sum is a genuine `HasSum`, not just a `tsum`.
+  have hF : ∀ t ∈ Set.Ioi (0 : ℝ),
+      HasSum (fun x : {x : Fin n → ℤ // x ≠ 0} =>
+        (1 : ℂ) * (Real.exp (-π * (q x.1 : ℝ) * t) : ℂ)) (F t) := by
+    intro t ht
+    have hsumm : Summable
+        (fun x : {x : Fin n → ℤ // x ≠ 0} => (Real.exp (-(π * (q x.1 : ℝ) * t)) : ℂ)) := by
+      letI thetaable := sliceGaussianThetaAble hn q hq (t * Complex.I) (by simpa using ht)
+      have hpt : ∀ x : Fin n → ℤ,
+          Complex.exp (↑π * Complex.I *
+              ((thetaable.qRe x : ℂ) + Complex.I * (thetaable.qIm x : ℂ))
+              + 2 * ↑π * Complex.I * ((0 : (Fin n → ℤ) →ₗ[ℤ] ℂ) x))
+            = (Real.exp (-(π * (q x : ℝ) * t)) : ℂ) := by
+        intro x
+        have hRe : thetaable.qRe x = 0 := by rw [sliceGaussianThetaAble_qRe_apply]; simp
+        have hIm : thetaable.qIm x = t * (q x : ℝ) := by
+          rw [sliceGaussianThetaAble_qIm_apply]; simp
+        rw [hRe, hIm, LinearMap.zero_apply, mul_zero, add_zero, Complex.ofReal_zero, zero_add,
+          Complex.ofReal_exp]
+        congr 1
+        have hII : Complex.I * Complex.I = -1 := Complex.I_mul_I
+        push_cast
+        linear_combination (↑π * ↑t * ((q x : ℤ) : ℂ)) * hII
+      exact (ThetaAbleQuadraticForm.theta_fun_summable
+        (0 : (Fin n → ℤ) →ₗ[ℤ] ℂ) (M := Fin n → ℤ)).congr hpt |>.comp_injective
+        Subtype.coe_injective
+    simpa [hF_def, neg_mul] using hsumm.hasSum
+  -- the real-variable zeta convergence: same comparison to `latticeNormSq` used by
+  -- `quadraticFormZetaAble` itself.
+  have h_sum : Summable (fun x : {x : Fin n → ℤ // x ≠ 0} =>
+      ‖(1 : ℂ)‖ / (q x.1 : ℝ) ^ s.re) := by
+    simp only [norm_one]
     have hrw : ∀ x : {x : Fin n → ℤ // x ≠ 0},
-        (1 / (π * (q x.1 : ℝ))) ^ s.re * Real.Gamma s.re
-          = Real.Gamma s.re * (π ^ (-s.re) * (q x.1 : ℝ) ^ (-s.re)) := by
-      intro x
+        (1 : ℝ) / (q x.1 : ℝ) ^ s.re = (q x.1 : ℝ) ^ (-s.re) := fun x => by
       have hx : (0 : ℝ) < (q x.1 : ℝ) := by exact_mod_cast hq x.1 x.2
-      rw [one_div, Real.inv_rpow (by positivity), ← Real.rpow_neg (by positivity),
-        Real.mul_rpow Real.pi_pos.le hx.le]
-      ring
+      rw [Real.rpow_neg hx.le, one_div]
     simp_rw [hrw]
-    refine (Summable.mul_left _ ?_).mul_left _
     obtain ⟨c, hc_pos, hc_le⟩ := LowerBound_of_pythagorean_exists hn q hq
     have hc_summable := (summable_latticeNormSq_rpow hs).mul_left (c ^ (-s.re))
     refine Summable.of_nonneg_of_le
@@ -1421,40 +1401,15 @@ theorem tsum_integral_lattice_term_eq_integral_tsum
     have hble : c * latticeNormSq x.1 ≤ (q x.1 : ℝ) := hc_le x.1
     rw [Real.rpow_neg hx.le, Real.rpow_neg (mul_pos hc_pos hnsq_pos).le]
     gcongr
-  have hmain := (hasSum_integral_of_summable_integral_norm hInt hsummable).tsum_eq
-  calc ∑' x : {x : Fin n → ℤ // x ≠ 0},
-        ∫ t : ℝ in Set.Ioi (0 : ℝ), (t : ℂ) ^ (s - 1) * (Real.exp (-(π * (q x.1 : ℝ) * t)) : ℂ)
-      = ∑' x : {x : Fin n → ℤ // x ≠ 0}, ∫ t : ℝ in Set.Ioi (0 : ℝ), F x t := by simp only [hF]
-    _ = ∫ t : ℝ in Set.Ioi (0 : ℝ), ∑' x : {x : Fin n → ℤ // x ≠ 0}, F x t := hmain
-    _ = ∫ t : ℝ in Set.Ioi (0 : ℝ),
-          (t : ℂ) ^ (s - 1) *
-            ∑' x : {x : Fin n → ℤ // x ≠ 0}, (Real.exp (-(π * (q x.1 : ℝ) * t)) : ℂ) := by
-        refine setIntegral_congr_fun measurableSet_Ioi fun t _ => ?_
-        simp only [hF]
-        exact tsum_mul_left
-
-/-- The Mellin transform formula linking the zeta function `ζ_q(s)` of `q` (`QuadraticFormZeta.lean`)
-to the theta sum `∑' x ≠ 0, exp (-π (q x) t)` (i.e. `θ(0; itq) - 1`, the `sliceGaussianThetaAble`
-theta function at shift `z = 0` and purely imaginary `τ = it`, see
-`sliceGaussianThetaAble_qRe_apply`/`sliceGaussianThetaAble_qIm_apply`):
-`Γ(s) π⁻ˢ ζ_q(s) = ∫₀^∞ tˢ⁻¹ (θ(0; itq) - 1) dt`, valid for `s.re > n/2`, the convergence threshold
-already required by `quadraticFormZetaAble`. The left side is `zeta_fun ⟨s, hs⟩` for the
-`quadraticFormZetaAble hn q hq` instance, written out as its defining sum to avoid threading that
-instance through named-argument elaboration. Obtained by summing
-`gammaIntegral_eq_lattice_term_mellin` over all nonzero lattice points and applying
-`tsum_integral_lattice_term_eq_integral_tsum`. -/
-theorem zeta_eq_theta_mellin
-    {n : ℕ} (hn : n ≠ 0) (q : QuadraticMap ℤ (Fin n → ℤ) ℤ) (hq : q.PosDef)
-    {s : ℂ} (hs : s.re > (n : ℝ) / 2) :
-    Gamma s * (↑π : ℂ) ^ (-s) * ∑' x : {x : Fin n → ℤ // x ≠ 0}, ((q x.1 : ℤ) : ℂ) ^ (-s)
-      = ∫ t : ℝ in Set.Ioi (0 : ℝ),
-          (t : ℂ) ^ (s - 1) *
-            ∑' x : {x : Fin n → ℤ // x ≠ 0}, (Real.exp (-(π * (q x.1 : ℝ) * t)) : ℂ) := by
-  have hs' : (0 : ℝ) < s.re := lt_trans (by positivity) hs
-  rw [← tsum_integral_lattice_term_eq_integral_tsum hn q hq hs, ← tsum_mul_left]
+  have htsum := (hasSum_mellin_pi_mul hp hs0 hF h_sum).tsum_eq
+  have hmellin : mellin F s = ∫ t : ℝ in Set.Ioi (0 : ℝ), (t : ℂ) ^ (s - 1) * F t := by
+    simp [mellin, smul_eq_mul]
+  rw [hmellin] at htsum
+  rw [← htsum, ← tsum_mul_left]
   refine tsum_congr fun x => ?_
   have hx : (0 : ℝ) < (q x.1 : ℝ) := by exact_mod_cast hq x.1 x.2
-  rw [← gammaIntegral_eq_lattice_term_mellin q hx hs']
+  rw [show ((q x.1 : ℤ) : ℂ) = ((q x.1 : ℝ) : ℂ) by push_cast; ring,
+    Complex.cpow_neg, Complex.cpow_neg, mul_one, div_eq_mul_inv]
   ring
 
 section TsumSplitPoint

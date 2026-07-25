@@ -20,3 +20,5 @@ require mathlib from git
 @[default_target] lean_lib ZetaThetaFunctions.Sp2gR {}
 @[default_target] lean_lib ZetaThetaFunctions.ThetaFunctions {}
 @[default_target] lean_lib ZetaThetaFunctions.MobiusInvariantProduct {}
+@[default_target] lean_lib ZetaThetaFunctions.MultiplicativeCharacter {}
+@[default_target] lean_lib ZetaThetaFunctions.QuadraticFormZetaReflection {}
