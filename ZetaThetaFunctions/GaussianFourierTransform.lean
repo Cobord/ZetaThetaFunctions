@@ -150,21 +150,24 @@ noncomputable def modulatedGaussianCenter (A : Matrix (Fin g) (Fin g) ℂ)
   modulatedGaussian A (fun i => ((A.map Complex.re).mulVec (WithLp.ofLp center) i : ℂ) +
     I * (WithLp.ofLp centerXi i))
 
-/-- `modulatedGaussian A b` is integrable: it is dominated by a constant times the isotropic
-Gaussian `exp(-(π c / 2) ‖x‖²)`, where `c` is `Q := quadraticMapOfMatrix (2 • Re A)`'s
-`posDef_lower_bound` decay rate. The linear shift term is absorbed via a per-coordinate AM-GM
-("complete the square") estimate, halving the quadratic decay rate to make room for it. -/
-lemma modulatedGaussian_integrable (hg : g ≠ 0) (A : Matrix (Fin g) (Fin g) ℂ)
-    (hRe : (A.map Complex.re).PosDef) (b : Fin g → ℂ) :
-    MeasureTheory.Integrable (modulatedGaussian A b) := by
+/-- `modulatedGaussian A b` is dominated, uniformly in `x` and `b`, by `exp(K b) * exp(-(π c / 2)
+‖x‖²)` for a decay rate `c > 0` depending only on `Re A` (via `Q := quadraticMapOfMatrix (2 • Re
+A)`'s `posDef_lower_bound`), and `K b := (2π/c) ∑ (Re b i)²` depending only on `Re b`. Since `c` is
+independent of `b`, this is a single dominating function valid for all `b` in any bounded set,
+which is what lets `GaussianStuff/WickTheorem.lean` justify differentiating under the integral
+sign in `b`. Same completing-the-square technique as `modulatedGaussian_integrable` below. -/
+lemma exists_modulatedGaussian_norm_le (hg : g ≠ 0) (A : Matrix (Fin g) (Fin g) ℂ)
+    (hRe : (A.map Complex.re).PosDef) :
+    ∃ c > 0, ∀ (b : Fin g → ℂ) (x : EuclideanSpace ℝ (Fin g)),
+      ‖modulatedGaussian A b x‖ ≤
+        Real.exp ((2 * π / c) * ∑ i, (b i).re ^ 2) * Real.exp (-(π * c / 2) * ‖x‖ ^ 2) := by
   set Q : QuadraticMap ℝ (EuclideanSpace ℝ (Fin g)) ℝ :=
     quadraticMapOfMatrix ((2 : ℝ) • (A.map Complex.re)) with hQ_def
   have hQPosDef : Q.PosDef := quadraticMapOfMatrix_posDef hRe
   obtain ⟨c, hc_pos, hc⟩ := posDef_lower_bound hg Q (quadraticMapOfMatrix_continuous _) hQPosDef
+  refine ⟨c, hc_pos, fun b x => ?_⟩
   have hcne : c ≠ 0 := hc_pos.ne'
-  have hQ_eq : ∀ x : EuclideanSpace ℝ (Fin g),
-      Q x = ∑ i, ∑ j, (A.map Complex.re) i j * x i * x j := by
-    intro x
+  have hQ_eq : Q x = ∑ i, ∑ j, (A.map Complex.re) i j * x i * x j := by
     rw [hQ_def, quadraticMapOfMatrix_apply]
     have h2 : (⅟(2 : ℝ)) = (2 : ℝ)⁻¹ := invOf_eq_inv 2
     rw [Finset.mul_sum]
@@ -174,9 +177,9 @@ lemma modulatedGaussian_integrable (hg : g ≠ 0) (A : Matrix (Fin g) (Fin g) �
     simp only [Matrix.smul_apply, smul_eq_mul, Algebra.algebraMap_self_apply, h2]
     ring
   set w : Fin g → ℝ := fun i => (b i).re with hw_def
-  have hterm : ∀ (i : Fin g) (x : EuclideanSpace ℝ (Fin g)),
+  have hterm : ∀ i : Fin g,
       2 * π * (w i * x i) ≤ (π * c / 2) * (x i) ^ 2 + (2 * π / c) * (w i) ^ 2 := by
-    intro i x
+    intro i
     have hs1 : Real.sqrt (π * c / 2) ^ 2 = π * c / 2 := Real.sq_sqrt (by positivity)
     have hs2 : Real.sqrt (2 * π / c) ^ 2 = 2 * π / c := Real.sq_sqrt (by positivity)
     have hprod : Real.sqrt (π * c / 2) * Real.sqrt (2 * π / c) = π := by
@@ -194,38 +197,39 @@ lemma modulatedGaussian_integrable (hg : g ≠ 0) (A : Matrix (Fin g) (Fin g) �
       rw [hring, hs1, hs2, hprod]
     rw [hexpand] at hsq
     nlinarith [hsq]
-  have hlin_bound : ∀ x : EuclideanSpace ℝ (Fin g),
+  have hlin_bound :
       2 * π * ∑ i, w i * x i ≤ (π * c / 2) * ‖x‖ ^ 2 + (2 * π / c) * ∑ i, (w i) ^ 2 := by
-    intro x
     calc 2 * π * ∑ i, w i * x i = ∑ i, 2 * π * (w i * x i) := by rw [Finset.mul_sum]
       _ ≤ ∑ i, ((π * c / 2) * (x i) ^ 2 + (2 * π / c) * (w i) ^ 2) :=
-          Finset.sum_le_sum fun i _ => hterm i x
+          Finset.sum_le_sum fun i _ => hterm i
       _ = (π * c / 2) * ∑ i, (x i) ^ 2 + (2 * π / c) * ∑ i, (w i) ^ 2 := by
           rw [Finset.sum_add_distrib, Finset.mul_sum, Finset.mul_sum]
       _ = (π * c / 2) * ‖x‖ ^ 2 + (2 * π / c) * ∑ i, (w i) ^ 2 := by
           rw [EuclideanSpace.norm_sq_eq]
           congr 2
           exact Finset.sum_congr rfl fun i _ => by rw [Real.norm_eq_abs, sq_abs]
-  set K : ℝ := (2 * π / c) * ∑ i, (w i) ^ 2 with hK_def
-  have hnorm_eq : ∀ x : EuclideanSpace ℝ (Fin g),
-      ‖modulatedGaussian A b x‖ = Real.exp (-π * Q x + 2 * π * ∑ i, w i * x i) := by
-    intro x
+  have hnorm_eq : ‖modulatedGaussian A b x‖ = Real.exp (-π * Q x + 2 * π * ∑ i, w i * x i) := by
     rw [modulatedGaussian, Complex.norm_exp]
     congr 1
     rw [hQ_eq]
     simp [Complex.re_sum, Matrix.map_apply]
     unfold w
     rfl
-  have hbound : ∀ x : EuclideanSpace ℝ (Fin g),
-      ‖modulatedGaussian A b x‖ ≤ Real.exp K * Real.exp (-(π * c / 2) * ‖x‖ ^ 2) := by
-    intro x
-    rw [hnorm_eq, ← Real.exp_add]
-    apply Real.exp_le_exp.mpr
-    have h1 := hlin_bound x
-    have h2 : π * c * ‖x‖ ^ 2 ≤ π * Q x := by
-      rw [mul_assoc]
-      exact mul_le_mul_of_nonneg_left (hc x) Real.pi_pos.le
-    linarith [h1, h2]
+  rw [hnorm_eq, ← Real.exp_add]
+  apply Real.exp_le_exp.mpr
+  have h2 : π * c * ‖x‖ ^ 2 ≤ π * Q x := by
+    rw [mul_assoc]
+    exact mul_le_mul_of_nonneg_left (hc x) Real.pi_pos.le
+  linarith [hlin_bound, h2]
+
+/-- `modulatedGaussian A b` is integrable: `exists_modulatedGaussian_norm_le` dominates it by a
+constant times the isotropic Gaussian `exp(-(π c / 2) ‖x‖²)`, which Mathlib's
+`GaussianFourier.integrable_cexp_neg_mul_sq_norm_add` already knows is integrable. -/
+lemma modulatedGaussian_integrable (hg : g ≠ 0) (A : Matrix (Fin g) (Fin g) ℂ)
+    (hRe : (A.map Complex.re).PosDef) (b : Fin g → ℂ) :
+    MeasureTheory.Integrable (modulatedGaussian A b) := by
+  obtain ⟨c, hc_pos, hbound⟩ := exists_modulatedGaussian_norm_le hg A hRe
+  set K : ℝ := (2 * π / c) * ∑ i, (b i).re ^ 2 with hK_def
   have hCont : Continuous (modulatedGaussian A b) := by
     unfold modulatedGaussian
     fun_prop
@@ -242,7 +246,7 @@ lemma modulatedGaussian_integrable (hg : g ≠ 0) (A : Matrix (Fin g) (Fin g) �
         ((-(π * c / 2) * ‖x‖ ^ 2 : ℝ) : ℂ) from by push_cast; ring]
     exact Complex.ofReal_re _
   rw [hre]
-  exact hbound x
+  exact hbound b x
 
 /-- The oscillatory Fourier kernel `𝐞(-⟪v,ξ⟫)` absorbs directly into `modulatedGaussian`'s shift:
 `-2πi⟪v,ξ⟫ = 2π∑(-iξ_i)v_i`, so the Fourier transform of a Gaussian is literally the *bare

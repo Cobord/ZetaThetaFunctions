@@ -1,3 +1,4 @@
 /.lake
 ZetaThetaFunctions/MultiplicativeCharacter.lean
 ZetaThetaFunctions/QuadraticFormZetaReflection.lean
+GaussianStuff/*
